@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>단말 바코드 스캔 테스트</title>
+<style>
+  :root{--bg:#0f1115;--card:#1a1d24;--line:#2a2f3a;--txt:#e8eaf0;--sub:#9aa3b2;--acc:#3b82f6;--ok:#22c55e;--warn:#f59e0b;--bad:#ef4444}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--txt);font-family:-apple-system,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;font-size:15px}
+  header{padding:12px 16px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between}
+  header h1{font-size:17px;margin:0}
+  #status{font-size:12px;color:var(--sub)}
+  main{padding:12px 16px 40px;max-width:720px;margin:0 auto}
+  .cam{position:relative;background:#000;border-radius:12px;overflow:hidden;aspect-ratio:3/4;max-height:60vh;width:100%}
+  video{width:100%;height:100%;object-fit:cover;display:block}
+  .box{position:absolute;left:5%;right:5%;top:30%;height:40%;border:2px solid rgba(255,255,255,.85);border-radius:8px;box-shadow:0 0 0 9999px rgba(0,0,0,.35);pointer-events:none;transition:border-color .15s}
+  .box.hit{border-color:var(--ok)}
+  .cam .hint{position:absolute;left:0;right:0;bottom:8px;text-align:center;font-size:12px;color:#ddd}
+  .btns{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:12px 0}
+  button,.filebtn{background:var(--card);color:var(--txt);border:1px solid var(--line);border-radius:10px;padding:12px;font-size:15px;font-weight:600;text-align:center;cursor:pointer}
+  button.primary{background:var(--acc);border-color:var(--acc)}
+  button:disabled{opacity:.45}
+  .filebtn input{display:none}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-top:12px}
+  .card h2{font-size:14px;margin:0 0 8px;color:var(--sub);font-weight:600}
+  table{width:100%;border-collapse:collapse}
+  td{padding:7px 0;border-bottom:1px solid var(--line);vertical-align:top}
+  tr:last-child td{border-bottom:none}
+  td.k{width:92px;color:var(--sub);font-size:13px}
+  td.v{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:15px;word-break:break-all}
+  .src{font-family:inherit;font-size:11px;color:var(--sub);margin-left:6px}
+  .empty{color:#555}
+  .tag{display:inline-block;font-size:11px;padding:1px 6px;border-radius:6px;margin-left:6px;font-family:inherit}
+  .tag.ok{background:rgba(34,197,94,.15);color:var(--ok)}
+  .tag.bad{background:rgba(239,68,68,.15);color:var(--bad)}
+  #raw div{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;padding:5px 0;border-bottom:1px dashed var(--line);word-break:break-all}
+  #raw span.f{color:var(--warn);margin-right:6px}
+  #ocrText{white-space:pre-wrap;font-size:11px;color:var(--sub);max-height:140px;overflow:auto;margin-top:6px}
+  #preview{max-width:100%;border-radius:8px;display:none;margin-top:8px}
+</style>
+</head>
+<body>
+<header>
+  <h1>단말 바코드 스캔 테스트</h1>
+  <span id="status">준비</span>
+</header>
+<main>
+  <div class="cam">
+    <video id="video" playsinline muted></video>
+    <div class="box" id="box"></div>
+    <div class="hint">라벨 바코드를 흰 박스 안에 가로로 맞춰주세요</div>
+  </div>
+
+  <div class="btns">
+    <button class="primary" id="btnCam">카메라 시작</button>
+    <button id="btnTorch" disabled>플래시</button>
+    <button id="btnOcr" disabled>글자 인식 (모델명)</button>
+    <button id="btnReset">초기화 (다음 제품)</button>
+    <label class="filebtn" style="grid-column:1/-1">사진 파일로 테스트
+      <input type="file" id="file" accept="image/*">
+    </label>
+  </div>
+
+  <div class="card">
+    <h2>인식 결과</h2>
+    <table id="result"></table>
+  </div>
+
+  <div class="card">
+    <h2>읽힌 바코드 원본 (<span id="rawCnt">0</span>)</h2>
+    <div id="raw"></div>
+    <img id="preview" alt="">
+    <div id="ocrText"></div>
+  </div>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+<script type="module">
+import { readBarcodes, prepareZXingModule } from 'https://cdn.jsdelivr.net/npm/zxing-wasm@2.2.4/dist/reader/index.js';
+
+prepareZXingModule({
+  overrides: {
+    locateFile: (p, prefix) => p.endsWith('.wasm')
+      ? 'https://cdn.jsdelivr.net/npm/zxing-wasm@2.2.4/dist/reader/' + p
+      : prefix + p
+  }
+});
+
+const $ = id => document.getElementById(id);
+const video = $('video'), box = $('box'), statusEl = $('status');
+const canvas = document.createElement('canvas');
+const ctx = canvas.getContext('2d', { willReadFrequently: true });
+
+const READ_OPTS = {
+  tryHarder: true, tryInvert: true, tryRotate: true,
+  maxNumberOfSymbols: 20,
+  formats: ['Code128', 'Code39', 'EAN-13', 'UPC-A', 'QRCode', 'DataMatrix']
+};
+
+// ---------- 상태 ----------
+let codes = new Map();          // text -> format
+let ocr = { model: null, desc: null, text: '' };
+let stream = null, track = null, scanning = false, torchOn = false;
+
+// ---------- 판별 로직 ----------
+function luhn(n) {
+  let s = 0;
+  [...n].reverse().forEach((c, i) => { let d = +c; if (i % 2) { d *= 2; if (d > 9) d -= 9; } s += d; });
+  return s % 10 === 0;
+}
+
+function parse() {
+  const r = { brand: null, model: null, desc: null, serial: null, serialSrc: null,
+              imei: [], eid: null, gtin: null, notes: [] };
+  const imeiSet = new Set();
+
+  for (const [text, fmt] of codes) {
+    const t = text.trim();
+
+    // Apple 박스 QR: boxinfo.apple.com/.../01/<GTIN>/21/<Serial>?8040=IMEI1&8041=IMEI2&8042=EID
+    const ap = t.match(/boxinfo\.apple\.com\/.*?\/01\/(\d{14})\/21\/([A-Z0-9]+)(?:\?(.*))?/i);
+    if (ap) {
+      r.brand = 'Apple';
+      r.gtin = ap[1].replace(/^0+/, '');
+      r.serial = ap[2]; r.serialSrc = 'QR';
+      const q = new URLSearchParams(ap[3] || '');
+      ['8040', '8041'].forEach(k => q.get(k) && imeiSet.add(q.get(k)));
+      if (q.get('8042')) r.eid = q.get('8042');
+      continue;
+    }
+    if (/^\d{15}$/.test(t)) { imeiSet.add(t); continue; }                  // IMEI
+    if (/^89\d{30}$/.test(t)) { r.eid = r.eid || t; continue; }            // EID (eSIM)
+    if (/^(EAN-13|UPC-A)$/.test(fmt) || /^\d{12,14}$/.test(t)) {           // 상품 바코드
+      r.gtin = r.gtin || t.replace(/^0+/, '');
+      continue;
+    }
+    // Apple 시리얼 바코드는 앞에 'S' 가 붙음 (예: SXCJ4YY667N → XCJ4YY667N)
+    if (/^S[A-Z0-9]{10}$|^S[A-Z0-9]{12}$/.test(t) && /[A-Z]/.test(t.slice(1)) && !r.serial) {
+      r.serial = t.slice(1); r.serialSrc = '바코드'; r.brand = r.brand || 'Apple?';
+      continue;
+    }
+    // 그 외 영숫자 혼합 = 삼성 등 일련번호 후보
+    if (/^[A-Z0-9]{10,16}$/.test(t) && /[A-Z]/.test(t) && /\d/.test(t) && !r.serial) {
+      r.serial = t; r.serialSrc = '바코드';
+      continue;
+    }
+  }
+
+  r.imei = [...imeiSet];
+  if (r.gtin && /^8806/.test(r.gtin)) r.brand = r.brand || 'Samsung';
+  if (r.gtin && /^19\d/.test(r.gtin)) r.brand = r.brand?.replace('?', '') || 'Apple';
+  if (r.brand === 'Apple?' && r.gtin?.startsWith('19')) r.brand = 'Apple';
+
+  // OCR 결과로 모델명 보완
+  if (ocr.model) { r.model = ocr.model; if (/^SM-/.test(ocr.model)) r.brand = 'Samsung'; else r.brand = 'Apple'; }
+  if (ocr.desc) r.desc = ocr.desc;
+  if (r.brand === 'Apple?') r.brand = 'Apple';
+  return r;
+}
+
+function row(k, v, extra = '') {
+  return `<tr><td class="k">${k}</td><td class="v">${v ?? '<span class="empty">-</span>'}${extra}</td></tr>`;
+}
+
+function render() {
+  const r = parse();
+  let h = '';
+  h += row('제조사', r.brand);
+  h += row('모델명', r.model, r.model ? '<span class="src">(글자인식)</span>'
+            : '<span class="src">바코드에 없음 → [글자 인식] 사용</span>');
+  if (r.desc) h += row('제품', r.desc, '<span class="src">(글자인식)</span>');
+  h += row('일련번호', r.serial, r.serial ? `<span class="src">(${r.serialSrc})</span>` : '');
+  r.imei.forEach((m, i) => {
+    h += row(r.imei.length > 1 ? `IMEI ${i + 1}` : 'IMEI', m,
+      luhn(m) ? '<span class="tag ok">체크 OK</span>' : '<span class="tag bad">체크 오류</span>');
+  });
+  if (!r.imei.length) h += row('IMEI', null);
+  h += row('EID', r.eid);
+  h += row('EAN/UPC', r.gtin);
+  $('result').innerHTML = h;
+
+  $('rawCnt').textContent = codes.size;
+  $('raw').innerHTML = [...codes].map(([t, f]) =>
+    `<div><span class="f">${f}</span>${t.replace(/</g, '&lt;')}</div>`).join('');
+}
+
+function addCodes(list) {
+  let added = 0;
+  for (const b of list) {
+    if (!b.isValid || !b.text) continue;
+    if (!codes.has(b.text)) { codes.set(b.text, b.format); added++; }
+  }
+  if (added) {
+    box.classList.add('hit'); setTimeout(() => box.classList.remove('hit'), 250);
+    navigator.vibrate?.(60);
+    beep();
+    render();
+  }
+  return added;
+}
+
+let actx;
+function beep() {
+  try {
+    actx = actx || new (window.AudioContext || window.webkitAudioContext)();
+    const o = actx.createOscillator(), g = actx.createGain();
+    o.frequency.value = 1500; g.gain.value = 0.08;
+    o.connect(g); g.connect(actx.destination); o.start(); o.stop(actx.currentTime + 0.08);
+  } catch (e) {}
+}
+
+// ---------- 카메라 ----------
+async function startCam() {
+  if (stream) { stopCam(); return; }
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({
+      audio: false,
+      video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } }
+    });
+  } catch (e) {
+    statusEl.textContent = '카메라 권한 실패: ' + e.name;
+    alertBox('카메라를 열 수 없습니다 (' + e.name + '). HTTPS 주소인지, 브라우저 카메라 권한을 허용했는지 확인하세요.');
+    return;
+  }
+  video.srcObject = stream;
+  await video.play();
+  track = stream.getVideoTracks()[0];
+  try { await track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] }); } catch (e) {}
+  const caps = track.getCapabilities?.() || {};
+  $('btnTorch').disabled = !caps.torch;
+  $('btnOcr').disabled = false;
+  $('btnCam').textContent = '카메라 정지';
+  const s = track.getSettings();
+  statusEl.textContent = `카메라 ${s.width}×${s.height}`;
+  scanning = true;
+  loop();
+}
+
+function stopCam() {
+  scanning = false;
+  stream?.getTracks().forEach(t => t.stop());
+  stream = null; track = null; torchOn = false;
+  $('btnCam').textContent = '카메라 시작';
+  $('btnTorch').disabled = true;
+  statusEl.textContent = '정지';
+}
+
+// 화면의 흰 박스 영역만 잘라서 캔버스에 그림
+function grabBox(scale = 1) {
+  const vw = video.videoWidth, vh = video.videoHeight;
+  if (!vw) return null;
+  const el = video.getBoundingClientRect(), bx = box.getBoundingClientRect();
+  // object-fit: cover 보정
+  const k = Math.max(el.width / vw, el.height / vh);
+  const ox = (el.width - vw * k) / 2, oy = (el.height - vh * k) / 2;
+  const sx = Math.max(0, (bx.left - el.left - ox) / k), sy = Math.max(0, (bx.top - el.top - oy) / k);
+  const sw = Math.min(vw - sx, bx.width / k), sh = Math.min(vh - sy, bx.height / k);
+  canvas.width = Math.round(sw * scale); canvas.height = Math.round(sh * scale);
+  ctx.drawImage(video, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height);
+  return ctx.getImageData(0, 0, canvas.width, canvas.height);
+}
+
+async function loop() {
+  while (scanning) {
+    const img = grabBox();
+    if (img) {
+      const t0 = performance.now();
+      try { addCodes(await readBarcodes(img, READ_OPTS)); }
+      catch (e) { statusEl.textContent = '인식 오류: ' + e.message; }
+      const ms = Math.round(performance.now() - t0);
+      if (scanning) statusEl.textContent = `스캔 중 · ${ms}ms/프레임`;
+    }
+    await new Promise(r => setTimeout(r, 120));
+  }
+}
+
+// ---------- 글자 인식 (모델명) ----------
+let worker;
+async function runOcr(source) {
+  $('btnOcr').disabled = true;
+  statusEl.textContent = '글자 인식 중...';
+  try {
+    if (!worker) {
+      statusEl.textContent = 'OCR 엔진 로딩 중 (최초 1회)...';
+      worker = await Tesseract.createWorker('eng');
+    }
+    const { data } = await worker.recognize(source);
+    const txt = data.text.toUpperCase();
+    ocr.text = data.text;
+    const flat = txt.replace(/[ \t]+/g, ' ');
+    // 삼성: SM-S942NZWEKOD / SM-F976NZKIKOC
+    const sm = flat.match(/S[MN][-–—\s]?([A-Z]\d{3}[A-Z0-9]{4,8})/);
+    // 애플 부품번호: MJRW4KH/A, MLQC3KH/A
+    const apm = flat.match(/\b([MF][A-Z0-9]{3,4}[0-9]?[A-Z]{2})\s?\/\s?A\b/);
+    const ipd = flat.match(/IPHONE\s?\d+[^,\n]*,[^,\n]+,\s*\d+\s?[GT]B/);
+    if (sm) ocr.model = 'SM-' + sm[1].replace(/O(?=\d)/g, '0');
+    else if (apm) ocr.model = apm[1] + '/A';
+    if (ipd) ocr.desc = ipd[0].replace(/IPHONE/, 'iPhone').replace(/\bPRO\b/, 'Pro').replace(/\bMAX\b/, 'Max');
+    $('ocrText').textContent = '[OCR 원문]\n' + data.text.trim();
+    statusEl.textContent = ocr.model ? '모델명 인식됨' : '모델명 못 찾음 — 모델명 글자를 박스에 넣고 다시 시도';
+    render();
+  } catch (e) {
+    statusEl.textContent = 'OCR 오류: ' + e.message;
+  } finally {
+    $('btnOcr').disabled = false;
+  }
+}
+
+$('btnOcr').onclick = () => {
+  if (stream) {
+    grabBox(1);  // 박스 영역 캡처
+    runOcr(canvas);
+  } else if (lastFileCanvas) {
+    runOcr(lastFileCanvas);
+  }
+};
+
+// ---------- 사진 파일 테스트 ----------
+let lastFileCanvas = null;
+$('file').onchange = async e => {
+  const f = e.target.files[0]; if (!f) return;
+  statusEl.textContent = '사진 분석 중...';
+  const bmp = await createImageBitmap(f, { imageOrientation: 'from-image' });
+  const max = 2400, k = Math.min(1, max / Math.max(bmp.width, bmp.height));
+  const c = document.createElement('canvas');
+  c.width = Math.round(bmp.width * k); c.height = Math.round(bmp.height * k);
+  const cx = c.getContext('2d', { willReadFrequently: true });
+  cx.drawImage(bmp, 0, 0, c.width, c.height);
+  lastFileCanvas = c;
+  $('preview').src = c.toDataURL('image/jpeg', 0.7); $('preview').style.display = 'block';
+  const t0 = performance.now();
+  const res = await readBarcodes(cx.getImageData(0, 0, c.width, c.height), READ_OPTS);
+  addCodes(res); render();
+  statusEl.textContent = `사진: 바코드 ${res.length}개 · ${Math.round(performance.now() - t0)}ms`;
+  $('btnOcr').disabled = false;
+  e.target.value = '';
+};
+
+// ---------- 기타 ----------
+$('btnCam').onclick = startCam;
+$('btnTorch').onclick = async () => {
+  torchOn = !torchOn;
+  try { await track.applyConstraints({ advanced: [{ torch: torchOn }] }); } catch (e) {}
+  $('btnTorch').textContent = torchOn ? '플래시 끄기' : '플래시';
+};
+$('btnReset').onclick = () => {
+  codes.clear(); ocr = { model: null, desc: null, text: '' };
+  $('ocrText').textContent = ''; $('preview').style.display = 'none';
+  render();
+};
+function alertBox(msg) { $('ocrText').textContent = msg; }
+
+if (!window.isSecureContext) {
+  statusEl.textContent = 'HTTPS 아님 — 카메라 불가';
+  alertBox('카메라는 HTTPS 주소에서만 동작합니다. (사진 파일 테스트는 가능)');
+}
+render();
+</script>
+</body>
+</html>
