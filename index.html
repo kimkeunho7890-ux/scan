@@ -3,49 +3,82 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>단말 바코드 스캔 테스트</title>
+<title>출고 스캔</title>
 <style>
   :root{--bg:#0f1115;--card:#1a1d24;--line:#2a2f3a;--txt:#e8eaf0;--sub:#9aa3b2;--acc:#3b82f6;--ok:#22c55e;--warn:#f59e0b;--bad:#ef4444}
   *{box-sizing:border-box}
   body{margin:0;background:var(--bg);color:var(--txt);font-family:-apple-system,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;font-size:15px}
-  header{padding:12px 16px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between}
+  header{padding:10px 16px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;gap:8px}
   header h1{font-size:17px;margin:0}
-  #status{font-size:12px;color:var(--sub)}
+  header .me{font-size:12px;color:var(--sub);text-align:right}
+  header .me a{color:var(--acc);cursor:pointer;margin-left:6px}
   main{padding:12px 16px 40px;max-width:720px;margin:0 auto}
-  .cam{position:relative;background:#000;border-radius:12px;overflow:hidden;aspect-ratio:3/4;max-height:60vh;width:100%}
+  .bar{display:flex;justify-content:space-between;align-items:center;font-size:12px;color:var(--sub);margin-bottom:8px;gap:8px}
+  .bar a{color:var(--acc);cursor:pointer;white-space:nowrap}
+  #status{font-size:12px;color:var(--sub)}
+  .cam{position:relative;background:#000;border-radius:12px;overflow:hidden;aspect-ratio:3/4;max-height:52vh;width:100%}
   video{width:100%;height:100%;object-fit:cover;display:block}
   .box{position:absolute;left:5%;right:5%;top:30%;height:40%;border:2px solid rgba(255,255,255,.85);border-radius:8px;box-shadow:0 0 0 9999px rgba(0,0,0,.35);pointer-events:none;transition:border-color .15s}
   .box.hit{border-color:var(--ok)}
   .cam .hint{position:absolute;left:0;right:0;bottom:8px;text-align:center;font-size:12px;color:#ddd}
   .btns{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:12px 0}
-  button,.filebtn{background:var(--card);color:var(--txt);border:1px solid var(--line);border-radius:10px;padding:12px;font-size:15px;font-weight:600;text-align:center;cursor:pointer}
+  button,.filebtn{background:var(--card);color:var(--txt);border:1px solid var(--line);border-radius:10px;padding:12px;font-size:15px;font-weight:600;text-align:center;cursor:pointer;font-family:inherit}
   button.primary{background:var(--acc);border-color:var(--acc)}
-  button:disabled{opacity:.45}
+  button.save{background:var(--ok);border-color:var(--ok);color:#06240f;width:100%;margin-top:10px;font-size:16px}
+  button:disabled{opacity:.4}
   .filebtn input{display:none}
   .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-top:12px}
   .card h2{font-size:14px;margin:0 0 8px;color:var(--sub);font-weight:600}
   table{width:100%;border-collapse:collapse}
-  td{padding:7px 0;border-bottom:1px solid var(--line);vertical-align:top}
+  td{padding:7px 0;border-bottom:1px solid var(--line);vertical-align:middle}
   tr:last-child td{border-bottom:none}
-  td.k{width:92px;color:var(--sub);font-size:13px}
+  td.k{width:84px;color:var(--sub);font-size:13px}
   td.v{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:15px;word-break:break-all}
   .src{font-family:inherit;font-size:11px;color:var(--sub);margin-left:6px}
   .empty{color:#555}
-  .tag{display:inline-block;font-size:11px;padding:1px 6px;border-radius:6px;margin-left:6px;font-family:inherit}
+  .tag{display:inline-block;font-size:11px;padding:2px 7px;border-radius:6px;margin-left:6px;font-family:inherit;font-weight:600}
   .tag.ok{background:rgba(34,197,94,.15);color:var(--ok)}
   .tag.bad{background:rgba(239,68,68,.15);color:var(--bad)}
-  #raw div{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;padding:5px 0;border-bottom:1px dashed var(--line);word-break:break-all}
+  .tag.warn{background:rgba(245,158,11,.15);color:var(--warn)}
+  select,input[type=text],input[type=email],input[type=password]{width:100%;background:#0f1115;color:var(--txt);border:1px solid var(--line);border-radius:8px;padding:10px;font-size:15px;font-family:inherit}
+  #modelSel{font-family:ui-monospace,Menlo,Consolas,monospace}
+  #raw div,#recent div{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;padding:6px 0;border-bottom:1px dashed var(--line);word-break:break-all}
+  #recent div b{color:var(--txt)} #recent div span{color:var(--sub)}
   #raw span.f{color:var(--warn);margin-right:6px}
   #ocrText{white-space:pre-wrap;font-size:11px;color:var(--sub);max-height:140px;overflow:auto;margin-top:6px}
   #preview{max-width:100%;border-radius:8px;display:none;margin-top:8px}
+  details summary{cursor:pointer;color:var(--sub);font-size:13px}
+  #loginView{max-width:360px;margin:60px auto;padding:0 16px}
+  #loginView .card{display:grid;gap:10px}
+  #loginMsg{color:var(--bad);font-size:13px;min-height:1em}
+  .hidden{display:none!important}
+  .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#111;border:1px solid var(--line);padding:10px 16px;border-radius:10px;font-size:14px;z-index:9;opacity:0;transition:opacity .2s;pointer-events:none}
+  .toast.show{opacity:1}
 </style>
 </head>
 <body>
+
+<!-- 로그인 -->
+<div id="loginView" class="hidden">
+  <h1 style="font-size:20px">출고 스캔 로그인</h1>
+  <div class="card">
+    <input type="email" id="email" placeholder="이메일" autocomplete="username">
+    <input type="password" id="pw" placeholder="비밀번호" autocomplete="current-password">
+    <button class="primary" id="btnLogin">로그인</button>
+    <div id="loginMsg"></div>
+  </div>
+</div>
+
+<!-- 앱 -->
+<div id="appView" class="hidden">
 <header>
-  <h1>단말 바코드 스캔 테스트</h1>
-  <span id="status">준비</span>
+  <h1>출고 스캔</h1>
+  <div class="me"><span id="meName"></span><a id="btnLogout">로그아웃</a></div>
 </header>
 <main>
+  <div class="bar"><span id="stockInfo">재고리스트 불러오는 중...</span><a id="btnReloadStock">새로고침</a></div>
+  <div class="bar"><span id="status">준비</span></div>
+
   <div class="cam">
     <video id="video" playsinline muted></video>
     <div class="box" id="box"></div>
@@ -56,30 +89,50 @@
     <button class="primary" id="btnCam">카메라 시작</button>
     <button id="btnTorch" disabled>플래시</button>
     <button id="btnOcr" disabled>글자 인식 (모델명)</button>
-    <button id="btnReset">초기화 (다음 제품)</button>
+    <button id="btnReset">초기화</button>
     <label class="filebtn" style="grid-column:1/-1">사진 파일로 테스트
       <input type="file" id="file" accept="image/*">
     </label>
   </div>
 
   <div class="card">
-    <h2>인식 결과</h2>
+    <h2>인식 결과 <span id="matchTag"></span></h2>
+    <table>
+      <tr><td class="k">모델명</td><td><select id="modelSel"><option value="">— 모델 선택 —</option></select>
+        <div id="modelNote" class="src" style="margin:4px 0 0"></div></td></tr>
+      <tr><td class="k">출고가</td><td class="v" id="priceCell"><span class="empty">-</span></td></tr>
+    </table>
     <table id="result"></table>
+    <div style="margin-top:10px"><input type="text" id="memo" placeholder="출고처 / 메모 (선택)"></div>
+    <button class="save" id="btnSave" disabled>저장</button>
   </div>
 
   <div class="card">
-    <h2>읽힌 바코드 원본 (<span id="rawCnt">0</span>)</h2>
-    <div id="raw"></div>
-    <img id="preview" alt="">
-    <div id="ocrText"></div>
+    <h2>최근 저장 (<span id="recentCnt">0</span>)</h2>
+    <div id="recent"><span class="empty">-</span></div>
+  </div>
+
+  <div class="card">
+    <details>
+      <summary>읽힌 바코드 원본 (<span id="rawCnt">0</span>)</summary>
+      <div id="raw"></div>
+      <img id="preview" alt="">
+      <div id="ocrText"></div>
+    </details>
   </div>
 </main>
+</div>
+<div class="toast" id="toast"></div>
 
+<script src="config.js"></script>
+<script src="appwrite.js"></script>
+<script src="stock.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 <script type="module">
 const $ = id => document.getElementById(id);
+const C = window.APP_CONFIG;
 
-// 바코드 라이브러리는 동적 로딩 — 실패해도 페이지/카메라는 동작하고 오류를 화면에 표시
+// ---------- 바코드 엔진 (동적 로딩) ----------
 const ZX = 'https://cdn.jsdelivr.net/npm/zxing-wasm@2.2.4/dist';
 let readBarcodes = null;
 const libReady = import(ZX + '/es/reader/index.js').then(m => {
@@ -89,27 +142,90 @@ const libReady = import(ZX + '/es/reader/index.js').then(m => {
   });
   readBarcodes = m.readBarcodes;
   return true;
-}).catch(e => {
-  $('status').textContent = '바코드 엔진 로딩 실패';
-  $('ocrText').textContent = '바코드 엔진 로딩 실패: ' + e.message + '\n(인터넷 연결 또는 cdn.jsdelivr.net 차단 여부 확인)';
-  return false;
-});
-const video = $('video'), box = $('box'), statusEl = $('status');
+}).catch(e => { setStatus('바코드 엔진 로딩 실패: ' + e.message); return false; });
+
+const video = $('video'), box = $('box');
 const canvas = document.createElement('canvas');
 const ctx = canvas.getContext('2d', { willReadFrequently: true });
-
 const READ_OPTS = {
-  tryHarder: true, tryInvert: true, tryRotate: true,
-  maxNumberOfSymbols: 20,
+  tryHarder: true, tryInvert: true, tryRotate: true, maxNumberOfSymbols: 20,
   formats: ['Code128', 'Code39', 'EAN-13', 'UPC-A', 'QRCode', 'DataMatrix']
 };
 
 // ---------- 상태 ----------
-let codes = new Map();          // text -> format
-let ocr = { model: null, desc: null, text: '' };
+let user = null;
+let stockIdx = null;               // 재고 인덱스
+let codes = new Map();             // 바코드 text -> format
+let ocr = { model: null, desc: null };
+let modelManual = false;           // 사용자가 모델을 직접 바꿨는지
+let cur = null;                    // 현재 판별 결과 + 매칭 결과
 let stream = null, track = null, scanning = false, torchOn = false;
 
-// ---------- 판별 로직 ----------
+const setStatus = t => { $('status').textContent = t; };
+function toast(t) { const el = $('toast'); el.textContent = t; el.classList.add('show'); clearTimeout(toast._t); toast._t = setTimeout(() => el.classList.remove('show'), 1800); }
+const won = n => n ? Number(n).toLocaleString('ko-KR') + '원' : '-';
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+// ================= 로그인 =================
+async function boot() {
+  try { user = await AW.me(); } catch (e) { user = null; }
+  if (!user) { $('loginView').classList.remove('hidden'); $('appView').classList.add('hidden'); return; }
+  $('loginView').classList.add('hidden'); $('appView').classList.remove('hidden');
+  $('meName').textContent = user.name || user.email;
+  loadStock();
+  loadRecent();
+  render();
+}
+$('btnLogin').onclick = async () => {
+  $('loginMsg').textContent = '';
+  try { await AW.login($('email').value.trim(), $('pw').value); boot(); }
+  catch (e) { $('loginMsg').textContent = '로그인 실패: ' + e.message; }
+};
+$('pw').addEventListener('keydown', e => { if (e.key === 'Enter') $('btnLogin').click(); });
+$('btnLogout').onclick = async () => { stopCam(); await AW.logout(); location.reload(); };
+
+// ================= 재고리스트 =================
+const CACHE_KEY = 'stock_cache_' + C.projectId;
+async function loadStock(force = false) {
+  $('stockInfo').textContent = '재고리스트 불러오는 중...';
+  try {
+    const meta = await AW.fileMeta(C.bucketId, C.stockFileId);
+    let text = null;
+    if (!force) {
+      try { const c = JSON.parse(localStorage.getItem(CACHE_KEY) || 'null');
+            if (c && c.updatedAt === meta.$updatedAt) text = c.text; } catch (e) {}
+    }
+    if (!text) {
+      text = await AW.fileText(C.bucketId, C.stockFileId);
+      try { localStorage.setItem(CACHE_KEY, JSON.stringify({ updatedAt: meta.$updatedAt, text })); } catch (e) {}
+    }
+    const rows = Stock.toStockRows(Stock.parseCSV(text));
+    stockIdx = Stock.buildIndex(rows);
+    fillModelSelect();
+    const d = new Date(meta.$updatedAt);
+    $('stockInfo').textContent = `재고 ${rows.length.toLocaleString()}건 · ${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')} 등록본`;
+    render();
+  } catch (e) {
+    stockIdx = null;
+    $('stockInfo').textContent = e.code === 404 ? '등록된 재고리스트 없음 (admin.html에서 등록)' : '재고리스트 오류: ' + e.message;
+  }
+}
+$('btnReloadStock').onclick = () => loadStock(true);
+
+function fillModelSelect() {
+  const sel = $('modelSel'), v = sel.value;
+  sel.innerHTML = '<option value="">— 모델 선택 —</option>' +
+    (stockIdx?.models || []).map(m => `<option>${esc(m)}</option>`).join('');
+  if (v) setModel(v);
+}
+function setModel(m) {
+  const sel = $('modelSel');
+  if (m && ![...sel.options].some(o => o.value === m)) sel.add(new Option(m + ' (재고 외)', m));
+  sel.value = m || '';
+}
+$('modelSel').onchange = () => { modelManual = true; render(); };
+
+// ================= 판별 로직 =================
 function luhn(n) {
   let s = 0;
   [...n].reverse().forEach((c, i) => { let d = +c; if (i % 2) { d *= 2; if (d > 9) d -= 9; } s += d; });
@@ -117,90 +233,99 @@ function luhn(n) {
 }
 
 function parse() {
-  const r = { brand: null, model: null, desc: null, serial: null, serialSrc: null,
-              imei: [], eid: null, gtin: null, notes: [] };
+  const r = { brand: null, serial: null, serialFull: null, serialSrc: null, imei: [], eid: null, gtin: null };
   const imeiSet = new Set();
-
   for (const [text, fmt] of codes) {
     const t = text.trim();
-
-    // Apple 박스 QR: boxinfo.apple.com/.../01/<GTIN>/21/<Serial>?8040=IMEI1&8041=IMEI2&8042=EID
     const ap = t.match(/boxinfo\.apple\.com\/.*?\/01\/(\d{14})\/21\/([A-Z0-9]+)(?:\?(.*))?/i);
     if (ap) {
-      r.brand = 'Apple';
-      r.gtin = ap[1].replace(/^0+/, '');
-      r.serial = ap[2]; r.serialSrc = 'QR';
+      r.brand = 'Apple'; r.gtin = ap[1].replace(/^0+/, ''); r.serial = ap[2]; r.serialSrc = 'QR';
       const q = new URLSearchParams(ap[3] || '');
       ['8040', '8041'].forEach(k => q.get(k) && imeiSet.add(q.get(k)));
       if (q.get('8042')) r.eid = q.get('8042');
       continue;
     }
-    if (/^\d{15}$/.test(t)) { imeiSet.add(t); continue; }                  // IMEI
-    if (/^89\d{30}$/.test(t)) { r.eid = r.eid || t; continue; }            // EID (eSIM)
-    if (/^(EAN-13|UPC-A)$/.test(fmt) || /^\d{12,14}$/.test(t)) {           // 상품 바코드
-      r.gtin = r.gtin || t.replace(/^0+/, '');
-      continue;
-    }
-    // Apple 시리얼 바코드는 앞에 'S' 가 붙음 (예: SXCJ4YY667N → XCJ4YY667N)
+    if (/^\d{15}$/.test(t)) { imeiSet.add(t); continue; }
+    if (/^89\d{30}$/.test(t)) { r.eid = r.eid || t; continue; }
+    if (/^(EAN-13|UPC-A)$/.test(fmt) || /^\d{12,14}$/.test(t)) { r.gtin = r.gtin || t.replace(/^0+/, ''); continue; }
     if (/^S[A-Z0-9]{10}$|^S[A-Z0-9]{12}$/.test(t) && /[A-Z]/.test(t.slice(1)) && !r.serial) {
-      r.serial = t.slice(1); r.serialSrc = '바코드'; r.brand = r.brand || 'Apple?';
-      continue;
+      r.serial = t.slice(1); r.serialSrc = '바코드'; r.brand = r.brand || 'Apple?'; continue;
     }
-    // 그 외 영숫자 혼합 = 삼성 등 일련번호 후보
     if (/^[A-Z0-9]{10,16}$/.test(t) && /[A-Z]/.test(t) && /\d/.test(t) && !r.serial) {
-      r.serial = t; r.serialSrc = '바코드';
-      continue;
+      r.serial = t; r.serialSrc = '바코드'; continue;
     }
   }
-
   r.imei = [...imeiSet];
   if (r.gtin && /^8806/.test(r.gtin)) r.brand = r.brand || 'Samsung';
-  if (r.gtin && /^19\d/.test(r.gtin)) r.brand = r.brand?.replace('?', '') || 'Apple';
-  if (r.brand === 'Apple?' && r.gtin?.startsWith('19')) r.brand = 'Apple';
-
-  // OCR 결과로 모델명 보완
-  if (ocr.model) { r.model = ocr.model; if (/^SM-/.test(ocr.model)) r.brand = 'Samsung'; else r.brand = 'Apple'; }
-  if (ocr.desc) r.desc = ocr.desc;
+  if (r.gtin && /^19\d/.test(r.gtin)) r.brand = 'Apple';
+  if (ocr.model) r.brand = /^SM-/.test(ocr.model) ? 'Samsung' : 'Apple';
   if (r.brand === 'Apple?') r.brand = 'Apple';
 
-  // 삼성: 일련번호 끝 알파벳 제외 후 그 앞 숫자 7자리 (CT7BM1097614N → 1097614)
+  // 삼성: 끝 알파벳 제외 후 숫자 7자리 (CT7BM1097614N → 1097614)
   if (r.serial && r.serialSrc === '바코드' && r.brand !== 'Apple') {
     const m = r.serial.replace(/[A-Z]+$/, '').match(/(\d{7})$/);
-    if (m) {
-      r.serialFull = r.serial;
-      r.serial = m[1];
-      r.brand = r.brand || 'Samsung';
-    }
+    if (m) { r.serialFull = r.serial; r.serial = m[1]; r.brand = r.brand || 'Samsung'; }
+  }
+
+  // 재고 매칭
+  r.match = { rows: [] };
+  if (stockIdx && r.serial) {
+    const cands = [r.serialFull, r.serial].filter(Boolean);
+    // 아이폰 시리얼은 'S' 붙은 원본도 같이 조회
+    for (const [t] of codes) if (/^S[A-Z0-9]{10,12}$/.test(t)) cands.push(t);
+    r.match = stockIdx.find(cands);
   }
   return r;
 }
 
 function row(k, v, extra = '') {
-  return `<tr><td class="k">${k}</td><td class="v">${v ?? '<span class="empty">-</span>'}${extra}</td></tr>`;
+  return `<tr><td class="k">${k}</td><td class="v">${v ? esc(v) : '<span class="empty">-</span>'}${extra}</td></tr>`;
 }
 
 function render() {
-  const r = parse();
+  cur = parse();
+  const r = cur, mr = r.match.rows;
+
+  // 모델 자동 선택
+  if (!modelManual) {
+    if (mr.length) setModel(mr[0].model);
+    else if (ocr.model) setModel(ocr.model);
+    else setModel('');
+  }
+  const model = $('modelSel').value;
+  const hitRow = mr.find(x => x.model === model);
+
+  // 매칭 뱃지 / 안내
+  let tag = '', note = '';
+  if (!r.serial) tag = '';
+  else if (!stockIdx) tag = '<span class="tag warn">재고리스트 없음</span>';
+  else if (mr.length === 1) tag = '<span class="tag ok">재고 일치</span>';
+  else if (mr.length > 1) { tag = `<span class="tag warn">후보 ${mr.length}건</span>`;
+    note = '같은 일련번호가 여러 모델에 있음: ' + mr.map(x => x.model).join(', '); }
+  else { tag = '<span class="tag bad">재고 미등록</span>'; note = '재고리스트에 없는 일련번호입니다. 모델을 직접 선택하세요.'; }
+  if (modelManual && model) note = (note ? note + ' · ' : '') + '직접 선택됨';
+  $('matchTag').innerHTML = tag;
+  $('modelNote').textContent = note;
+
+  // 출고가
+  const price = hitRow?.price || (model && stockIdx?.modelPrice.get(model)) || 0;
+  $('priceCell').innerHTML = price ? won(price) + (hitRow ? '' : '<span class="src">(모델 기준)</span>') : '<span class="empty">-</span>';
+  cur.price = price; cur.model = model; cur.matched = !!hitRow;
+
   let h = '';
   h += row('제조사', r.brand);
-  h += row('모델명', r.model, r.model ? '<span class="src">(글자인식)</span>'
-            : '<span class="src">바코드에 없음 → [글자 인식] 사용</span>');
-  if (r.desc) h += row('제품', r.desc, '<span class="src">(글자인식)</span>');
-  h += row('일련번호', r.serial, r.serialFull
-    ? `<span class="src">(원본 ${r.serialFull})</span>`
-    : r.serial ? `<span class="src">(${r.serialSrc})</span>` : '');
-  r.imei.forEach((m, i) => {
-    h += row(r.imei.length > 1 ? `IMEI ${i + 1}` : 'IMEI', m,
-      luhn(m) ? '<span class="tag ok">체크 OK</span>' : '<span class="tag bad">체크 오류</span>');
-  });
+  h += row('일련번호', r.serial, r.serialFull ? `<span class="src">(원본 ${esc(r.serialFull)})</span>`
+                                  : r.serial ? `<span class="src">(${r.serialSrc})</span>` : '');
+  r.imei.forEach((m, i) => h += row(r.imei.length > 1 ? `IMEI ${i + 1}` : 'IMEI', m,
+      luhn(m) ? '<span class="tag ok">체크 OK</span>' : '<span class="tag bad">체크 오류</span>'));
   if (!r.imei.length) h += row('IMEI', null);
   h += row('EID', r.eid);
   h += row('EAN/UPC', r.gtin);
   $('result').innerHTML = h;
 
+  $('btnSave').disabled = !(r.serial && model);
   $('rawCnt').textContent = codes.size;
-  $('raw').innerHTML = [...codes].map(([t, f]) =>
-    `<div><span class="f">${f}</span>${t.replace(/</g, '&lt;')}</div>`).join('');
+  $('raw').innerHTML = [...codes].map(([t, f]) => `<div><span class="f">${f}</span>${esc(t)}</div>`).join('');
 }
 
 function addCodes(list) {
@@ -211,171 +336,178 @@ function addCodes(list) {
   }
   if (added) {
     box.classList.add('hit'); setTimeout(() => box.classList.remove('hit'), 250);
-    navigator.vibrate?.(60);
-    beep();
-    render();
+    navigator.vibrate?.(60); beep(); render();
   }
-  return added;
 }
 
 let actx;
-function beep() {
+function beep(f = 1500) {
   try {
     actx = actx || new (window.AudioContext || window.webkitAudioContext)();
     const o = actx.createOscillator(), g = actx.createGain();
-    o.frequency.value = 1500; g.gain.value = 0.08;
+    o.frequency.value = f; g.gain.value = 0.08;
     o.connect(g); g.connect(actx.destination); o.start(); o.stop(actx.currentTime + 0.08);
   } catch (e) {}
 }
 
-// ---------- 카메라 ----------
+function resetItem() {
+  codes.clear(); ocr = { model: null, desc: null }; modelManual = false;
+  $('ocrText').textContent = ''; $('preview').style.display = 'none'; // 메모는 유지 (같은 출고처 연속 스캔)
+  render();
+}
+$('btnReset').onclick = resetItem;
+
+// ================= 저장 =================
+$('btnSave').onclick = async () => {
+  const r = cur; if (!r?.serial || !r.model) return;
+  $('btnSave').disabled = true;
+  try {
+    const dup = await AW.listDocs(C.databaseId, C.collectionId, [AW.Q.equal('serial', r.serial), AW.Q.limit(1)]);
+    if (dup.total > 0) {
+      const d = dup.documents[0];
+      if (!confirm(`이미 저장된 일련번호입니다.\n(${d.model} · ${new Date(d.$createdAt).toLocaleString('ko-KR')})\n그래도 저장할까요?`)) { render(); return; }
+    }
+    const doc = await AW.createDoc(C.databaseId, C.collectionId, {
+      model: r.model,
+      serial: r.serial,
+      serialRaw: r.serialFull || r.serial,
+      price: r.price ? Math.round(r.price) : null,
+      imei1: r.imei[0] || '',
+      imei2: r.imei[1] || '',
+      eid: r.eid || '',
+      gtin: r.gtin || '',
+      matched: !!r.matched,
+      memo: $('memo').value.trim(),
+      scannedBy: user.email,
+      raw: JSON.stringify([...codes]).slice(0, 2000)
+    });
+    beep(2200); toast('저장됨: ' + r.model + ' / ' + r.serial);
+    addRecent(doc, true);
+    resetItem();
+  } catch (e) {
+    alert('저장 실패: ' + e.message);
+    render();
+  }
+};
+
+async function loadRecent() {
+  try {
+    const res = await AW.listDocs(C.databaseId, C.collectionId, [AW.Q.orderDesc('$createdAt'), AW.Q.limit(20)]);
+    $('recent').innerHTML = '';
+    res.documents.forEach(d => addRecent(d));
+    $('recentCnt').textContent = res.total;
+  } catch (e) {
+    $('recent').innerHTML = `<span class="empty">불러오기 실패: ${esc(e.message)}</span>`;
+  }
+}
+function addRecent(d, top = false) {
+  const el = document.createElement('div');
+  const t = new Date(d.$createdAt);
+  el.innerHTML = `<b>${esc(d.model)}</b> ${esc(d.serial)} <span>${won(d.price)} · ${t.getMonth() + 1}/${t.getDate()} ${String(t.getHours()).padStart(2, '0')}:${String(t.getMinutes()).padStart(2, '0')}${d.memo ? ' · ' + esc(d.memo) : ''}${d.matched ? '' : ' · 재고외'}</span>`;
+  const box = $('recent');
+  if (box.querySelector('.empty')) box.innerHTML = '';
+  top ? box.prepend(el) : box.append(el);
+  if (top) $('recentCnt').textContent = (+$('recentCnt').textContent || 0) + 1;
+}
+
+// ================= 카메라 =================
 async function startCam() {
   if (stream) { stopCam(); return; }
+  if (!navigator.mediaDevices?.getUserMedia) { setStatus('이 브라우저는 카메라를 지원하지 않습니다 (HTTPS/인앱브라우저 확인)'); return; }
   try {
     stream = await navigator.mediaDevices.getUserMedia({
-      audio: false,
-      video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } }
+      audio: false, video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } }
     });
-  } catch (e) {
-    statusEl.textContent = '카메라 권한 실패: ' + e.name;
-    alertBox('카메라를 열 수 없습니다 (' + e.name + '). HTTPS 주소인지, 브라우저 카메라 권한을 허용했는지 확인하세요.');
-    return;
-  }
-  video.srcObject = stream;
-  await video.play();
+  } catch (e) { setStatus('카메라 권한 실패: ' + e.name); return; }
+  video.srcObject = stream; await video.play();
   track = stream.getVideoTracks()[0];
   try { await track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] }); } catch (e) {}
   const caps = track.getCapabilities?.() || {};
   $('btnTorch').disabled = !caps.torch;
   $('btnOcr').disabled = false;
   $('btnCam').textContent = '카메라 정지';
-  const s = track.getSettings();
-  statusEl.textContent = `카메라 ${s.width}×${s.height}`;
-  scanning = true;
-  loop();
+  const s = track.getSettings(); setStatus(`카메라 ${s.width}×${s.height}`);
+  scanning = true; loop();
 }
-
 function stopCam() {
   scanning = false;
   stream?.getTracks().forEach(t => t.stop());
   stream = null; track = null; torchOn = false;
-  $('btnCam').textContent = '카메라 시작';
-  $('btnTorch').disabled = true;
-  statusEl.textContent = '정지';
+  $('btnCam').textContent = '카메라 시작'; $('btnTorch').disabled = true;
+  setStatus('정지');
 }
-
-// 화면의 흰 박스 영역만 잘라서 캔버스에 그림
-function grabBox(scale = 1) {
-  const vw = video.videoWidth, vh = video.videoHeight;
-  if (!vw) return null;
+function grabBox() {
+  const vw = video.videoWidth, vh = video.videoHeight; if (!vw) return null;
   const el = video.getBoundingClientRect(), bx = box.getBoundingClientRect();
-  // object-fit: cover 보정
   const k = Math.max(el.width / vw, el.height / vh);
   const ox = (el.width - vw * k) / 2, oy = (el.height - vh * k) / 2;
   const sx = Math.max(0, (bx.left - el.left - ox) / k), sy = Math.max(0, (bx.top - el.top - oy) / k);
   const sw = Math.min(vw - sx, bx.width / k), sh = Math.min(vh - sy, bx.height / k);
-  canvas.width = Math.round(sw * scale); canvas.height = Math.round(sh * scale);
+  canvas.width = Math.round(sw); canvas.height = Math.round(sh);
   ctx.drawImage(video, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height);
   return ctx.getImageData(0, 0, canvas.width, canvas.height);
 }
-
 async function loop() {
   if (!(await libReady)) return;
   while (scanning) {
     const img = grabBox();
     if (img) {
       const t0 = performance.now();
-      try { addCodes(await readBarcodes(img, READ_OPTS)); }
-      catch (e) { statusEl.textContent = '인식 오류: ' + e.message; }
-      const ms = Math.round(performance.now() - t0);
-      if (scanning) statusEl.textContent = `스캔 중 · ${ms}ms/프레임`;
+      try { addCodes(await readBarcodes(img, READ_OPTS)); } catch (e) { setStatus('인식 오류: ' + e.message); }
+      if (scanning) setStatus(`스캔 중 · ${Math.round(performance.now() - t0)}ms/프레임`);
     }
     await new Promise(r => setTimeout(r, 120));
   }
 }
-
-// ---------- 글자 인식 (모델명) ----------
-let worker;
-async function runOcr(source) {
-  $('btnOcr').disabled = true;
-  statusEl.textContent = '글자 인식 중...';
-  try {
-    if (!worker) {
-      statusEl.textContent = 'OCR 엔진 로딩 중 (최초 1회)...';
-      worker = await Tesseract.createWorker('eng');
-    }
-    const { data } = await worker.recognize(source);
-    const txt = data.text.toUpperCase();
-    ocr.text = data.text;
-    const flat = txt.replace(/[ \t]+/g, ' ');
-    // 삼성: SM-S942NZWEKOD / SM-F976NZKIKOC
-    const sm = flat.match(/S[MN][-–—\s]?([A-Z]\d{3}[A-Z0-9]{4,8})/);
-    // 애플 부품번호: MJRW4KH/A, MLQC3KH/A
-    const apm = flat.match(/\b([MF][A-Z0-9]{3,4}[0-9]?[A-Z]{2})\s?\/\s?A\b/);
-    const ipd = flat.match(/IPHONE\s?\d+[^,\n]*,[^,\n]+,\s*\d+\s?[GT]B/);
-    if (sm) ocr.model = 'SM-' + sm[1].replace(/O(?=\d)/g, '0');
-    else if (apm) ocr.model = apm[1] + '/A';
-    if (ipd) ocr.desc = ipd[0].replace(/IPHONE/, 'iPhone').replace(/\bPRO\b/, 'Pro').replace(/\bMAX\b/, 'Max');
-    $('ocrText').textContent = '[OCR 원문]\n' + data.text.trim();
-    statusEl.textContent = ocr.model ? '모델명 인식됨' : '모델명 못 찾음 — 모델명 글자를 박스에 넣고 다시 시도';
-    render();
-  } catch (e) {
-    statusEl.textContent = 'OCR 오류: ' + e.message;
-  } finally {
-    $('btnOcr').disabled = false;
-  }
-}
-
-$('btnOcr').onclick = () => {
-  if (stream) {
-    grabBox(1);  // 박스 영역 캡처
-    runOcr(canvas);
-  } else if (lastFileCanvas) {
-    runOcr(lastFileCanvas);
-  }
-};
-
-// ---------- 사진 파일 테스트 ----------
-let lastFileCanvas = null;
-$('file').onchange = async e => {
-  const f = e.target.files[0]; if (!f) return;
-  statusEl.textContent = '사진 분석 중...';
-  const bmp = await createImageBitmap(f, { imageOrientation: 'from-image' });
-  const max = 2400, k = Math.min(1, max / Math.max(bmp.width, bmp.height));
-  const c = document.createElement('canvas');
-  c.width = Math.round(bmp.width * k); c.height = Math.round(bmp.height * k);
-  const cx = c.getContext('2d', { willReadFrequently: true });
-  cx.drawImage(bmp, 0, 0, c.width, c.height);
-  lastFileCanvas = c;
-  $('preview').src = c.toDataURL('image/jpeg', 0.7); $('preview').style.display = 'block';
-  if (!(await libReady)) return;
-  const t0 = performance.now();
-  const res = await readBarcodes(cx.getImageData(0, 0, c.width, c.height), READ_OPTS);
-  addCodes(res); render();
-  statusEl.textContent = `사진: 바코드 ${res.length}개 · ${Math.round(performance.now() - t0)}ms`;
-  $('btnOcr').disabled = false;
-  e.target.value = '';
-};
-
-// ---------- 기타 ----------
 $('btnCam').onclick = startCam;
 $('btnTorch').onclick = async () => {
   torchOn = !torchOn;
   try { await track.applyConstraints({ advanced: [{ torch: torchOn }] }); } catch (e) {}
   $('btnTorch').textContent = torchOn ? '플래시 끄기' : '플래시';
 };
-$('btnReset').onclick = () => {
-  codes.clear(); ocr = { model: null, desc: null, text: '' };
-  $('ocrText').textContent = ''; $('preview').style.display = 'none';
-  render();
-};
-function alertBox(msg) { $('ocrText').textContent = msg; }
 
-if (!window.isSecureContext) {
-  statusEl.textContent = 'HTTPS 아님 — 카메라 불가';
-  alertBox('카메라는 HTTPS 주소에서만 동작합니다. (사진 파일 테스트는 가능)');
+// ================= 글자 인식 (재고 미등록일 때 보조) =================
+let worker, lastFileCanvas = null;
+async function runOcr(source) {
+  $('btnOcr').disabled = true; setStatus('글자 인식 중...');
+  try {
+    if (!worker) { setStatus('OCR 엔진 로딩 중 (최초 1회)...'); worker = await Tesseract.createWorker('eng'); }
+    const { data } = await worker.recognize(source);
+    const flat = data.text.toUpperCase().replace(/[ \t]+/g, ' ');
+    const sm = flat.match(/S[MN][-–—\s]?([A-Z]\d{3}[A-Z0-9]{4,8})/);
+    const apm = flat.match(/\b([MF][A-Z0-9]{3,4}[0-9]?[A-Z]{2})\s?\/\s?A\b/);
+    if (sm) ocr.model = 'SM-' + sm[1].replace(/O(?=\d)/g, '0');
+    else if (apm) ocr.model = apm[1] + '/A';
+    $('ocrText').textContent = '[OCR 원문]\n' + data.text.trim();
+    setStatus(ocr.model ? '글자인식 모델: ' + ocr.model : '모델명 못 찾음');
+    render();
+  } catch (e) { setStatus('OCR 오류: ' + e.message); }
+  finally { $('btnOcr').disabled = false; }
 }
-render();
+$('btnOcr').onclick = () => { if (stream) { grabBox(); runOcr(canvas); } else if (lastFileCanvas) runOcr(lastFileCanvas); };
+
+// ================= 사진 파일 테스트 =================
+$('file').onchange = async e => {
+  const f = e.target.files[0]; if (!f) return;
+  setStatus('사진 분석 중...');
+  if (!(await libReady)) return;
+  const bmp = await createImageBitmap(f, { imageOrientation: 'from-image' });
+  const k = Math.min(1, 2400 / Math.max(bmp.width, bmp.height));
+  const c = document.createElement('canvas');
+  c.width = Math.round(bmp.width * k); c.height = Math.round(bmp.height * k);
+  const cx = c.getContext('2d', { willReadFrequently: true });
+  cx.drawImage(bmp, 0, 0, c.width, c.height);
+  lastFileCanvas = c;
+  $('preview').src = c.toDataURL('image/jpeg', 0.7); $('preview').style.display = 'block';
+  const t0 = performance.now();
+  const res = await readBarcodes(cx.getImageData(0, 0, c.width, c.height), READ_OPTS);
+  addCodes(res); render();
+  setStatus(`사진: 바코드 ${res.length}개 · ${Math.round(performance.now() - t0)}ms`);
+  $('btnOcr').disabled = false;
+  e.target.value = '';
+};
+
+boot();
 </script>
 </body>
 </html>
