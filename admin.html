@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>재고리스트 등록</title>
+<style>
+  :root{--bg:#0f1115;--card:#1a1d24;--line:#2a2f3a;--txt:#e8eaf0;--sub:#9aa3b2;--acc:#3b82f6;--ok:#22c55e;--warn:#f59e0b;--bad:#ef4444}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--txt);font-family:-apple-system,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;font-size:15px}
+  header{padding:12px 16px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center}
+  header h1{font-size:17px;margin:0}
+  header a{color:var(--acc);cursor:pointer;font-size:13px;margin-left:10px}
+  main{max-width:760px;margin:0 auto;padding:16px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:12px}
+  .card h2{font-size:14px;color:var(--sub);margin:0 0 10px;font-weight:600}
+  input[type=email],input[type=password]{width:100%;background:#0f1115;color:var(--txt);border:1px solid var(--line);border-radius:8px;padding:10px;font-size:15px;margin-bottom:8px}
+  button{background:var(--acc);color:#fff;border:0;border-radius:10px;padding:12px 16px;font-size:15px;font-weight:600;cursor:pointer;font-family:inherit}
+  button:disabled{opacity:.4}
+  .drop{border:2px dashed var(--line);border-radius:12px;padding:28px;text-align:center;color:var(--sub);cursor:pointer}
+  .drop.over{border-color:var(--acc);color:var(--txt)}
+  .stats{display:flex;gap:16px;flex-wrap:wrap;margin:10px 0;font-size:14px}
+  .stats b{font-size:18px;display:block}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th,td{text-align:left;padding:6px 4px;border-bottom:1px solid var(--line)}
+  th{color:var(--sub);font-weight:600}
+  td.n{text-align:right;font-variant-numeric:tabular-nums}
+  .msg{font-size:13px;margin-top:8px}
+  .ok{color:var(--ok)} .bad{color:var(--bad)} .warn{color:var(--warn)}
+  .hidden{display:none!important}
+</style>
+</head>
+<body>
+<header><h1>재고리스트 등록</h1><div><span id="me" style="font-size:12px;color:var(--sub)"></span><a href="./">스캔 화면</a><a id="btnLogout" class="hidden">로그아웃</a></div></header>
+<main>
+  <div class="card" id="loginCard">
+    <h2>관리자 로그인</h2>
+    <input type="email" id="email" placeholder="이메일" autocomplete="username">
+    <input type="password" id="pw" placeholder="비밀번호" autocomplete="current-password">
+    <button id="btnLogin">로그인</button>
+    <div class="msg bad" id="loginMsg"></div>
+  </div>
+
+  <div id="adminBody" class="hidden">
+    <div class="card">
+      <h2>현재 등록된 재고리스트</h2>
+      <div id="curInfo">확인 중...</div>
+    </div>
+
+    <div class="card">
+      <h2>새 재고리스트 업로드 (CSV / XLSX · 컬럼: 모델명, 일련번호, 출고가)</h2>
+      <label class="drop" id="drop">파일을 끌어다 놓거나 눌러서 선택
+        <input type="file" id="file" accept=".csv,.xlsx,.xls" hidden>
+      </label>
+      <div id="preview" class="hidden">
+        <div class="stats" id="stats"></div>
+        <table id="tbl"></table>
+        <div class="msg" id="warnMsg"></div>
+        <button id="btnUpload" style="margin-top:12px;width:100%">서버에 등록 (기존 리스트 교체)</button>
+      </div>
+      <div class="msg" id="upMsg"></div>
+    </div>
+  </div>
+</main>
+
+<script src="config.js"></script>
+<script src="appwrite.js"></script>
+<script src="stock.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script>
+const $ = id => document.getElementById(id);
+const C = window.APP_CONFIG;
+let parsed = null;
+
+async function boot() {
+  let user = null;
+  try { user = await AW.me(); } catch (e) {}
+  $('loginCard').classList.toggle('hidden', !!user);
+  $('adminBody').classList.toggle('hidden', !user);
+  $('btnLogout').classList.toggle('hidden', !user);
+  if (user) { $('me').textContent = user.email; showCurrent(); }
+}
+$('btnLogin').onclick = async () => {
+  try { await AW.login($('email').value.trim(), $('pw').value); boot(); }
+  catch (e) { $('loginMsg').textContent = '로그인 실패: ' + e.message; }
+};
+$('pw').addEventListener('keydown', e => { if (e.key === 'Enter') $('btnLogin').click(); });
+$('btnLogout').onclick = async () => { await AW.logout(); location.reload(); };
+
+async function showCurrent() {
+  try {
+    const m = await AW.fileMeta(C.bucketId, C.stockFileId);
+    const text = await AW.fileText(C.bucketId, C.stockFileId);
+    const rows = Stock.toStockRows(Stock.parseCSV(text));
+    $('curInfo').innerHTML = `<b>${rows.length.toLocaleString()}건</b> · 모델 ${new Set(rows.map(r => r.model)).size}종 · 등록 ${new Date(m.$updatedAt).toLocaleString('ko-KR')}`;
+  } catch (e) {
+    $('curInfo').innerHTML = e.code === 404 ? '<span class="warn">등록된 리스트 없음</span>' : `<span class="bad">오류: ${e.message}</span>`;
+  }
+}
+
+// ---------- 파일 읽기 (CSV는 UTF-8 / EUC-KR 자동판별, XLSX는 첫 시트) ----------
+async function readTable(file) {
+  const buf = await file.arrayBuffer();
+  if (/\.xlsx?$/i.test(file.name)) {
+    const wb = XLSX.read(buf, { type: 'array' });
+    return XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, raw: false, defval: '' });
+  }
+  let text;
+  try { text = new TextDecoder('utf-8', { fatal: true }).decode(buf); }
+  catch (e) { text = new TextDecoder('euc-kr').decode(buf); }
+  return Stock.parseCSV(text.replace(/^﻿/, ''));
+}
+
+async function handleFile(file) {
+  $('upMsg').textContent = ''; $('preview').classList.add('hidden');
+  try {
+    const rows = Stock.toStockRows(await readTable(file));
+    if (!rows.length) throw new Error('데이터 행이 없습니다');
+    parsed = { rows, name: file.name };
+    const serialCnt = new Map();
+    rows.forEach(r => serialCnt.set(r.serial, (serialCnt.get(r.serial) || 0) + 1));
+    const dups = [...serialCnt].filter(([, n]) => n > 1).length;
+    const noPrice = rows.filter(r => !r.price).length;
+    $('stats').innerHTML = `
+      <div><b>${rows.length.toLocaleString()}</b>재고 건수</div>
+      <div><b>${new Set(rows.map(r => r.model)).size}</b>모델 종류</div>
+      <div><b class="${dups ? 'warn' : ''}">${dups}</b>중복 일련번호</div>
+      <div><b class="${noPrice ? 'warn' : ''}">${noPrice}</b>출고가 없음</div>`;
+    $('tbl').innerHTML = '<tr><th>모델명</th><th>일련번호</th><th style="text-align:right">출고가</th></tr>' +
+      rows.slice(0, 8).map(r => `<tr><td>${r.model}</td><td>${r.serial}</td><td class="n">${r.price ? r.price.toLocaleString() : '-'}</td></tr>`).join('') +
+      (rows.length > 8 ? `<tr><td colspan="3" style="color:var(--sub)">… 외 ${rows.length - 8}건</td></tr>` : '');
+    $('warnMsg').innerHTML = dups ? '<span class="warn">중복 일련번호는 스캔 시 후보로 모두 표시됩니다.</span>' : '';
+    $('preview').classList.remove('hidden');
+  } catch (e) {
+    parsed = null;
+    $('upMsg').innerHTML = `<span class="bad">파일 오류: ${e.message}</span>`;
+  }
+}
+
+$('file').onchange = e => e.target.files[0] && handleFile(e.target.files[0]);
+const drop = $('drop');
+drop.ondragover = e => { e.preventDefault(); drop.classList.add('over'); };
+drop.ondragleave = () => drop.classList.remove('over');
+drop.ondrop = e => { e.preventDefault(); drop.classList.remove('over'); e.dataTransfer.files[0] && handleFile(e.dataTransfer.files[0]); };
+
+$('btnUpload').onclick = async () => {
+  if (!parsed) return;
+  const blob = new Blob([Stock.toCSV(parsed.rows)], { type: 'text/csv' });
+  if (blob.size > 5 * 1024 * 1024) { $('upMsg').innerHTML = '<span class="bad">5MB 초과 — 행 수를 줄여주세요</span>'; return; }
+  $('btnUpload').disabled = true; $('upMsg').textContent = '업로드 중...';
+  try {
+    try { await AW.deleteFile(C.bucketId, C.stockFileId); } catch (e) { if (e.code !== 404) throw e; }
+    await AW.uploadFile(C.bucketId, C.stockFileId, blob, 'stocklist.csv');
+    $('upMsg').innerHTML = `<span class="ok">등록 완료: ${parsed.rows.length.toLocaleString()}건</span>`;
+    $('preview').classList.add('hidden');
+    showCurrent();
+  } catch (e) {
+    $('upMsg').innerHTML = `<span class="bad">업로드 실패: ${e.message}</span>` +
+      (e.code === 401 ? '<br>이 계정에 버킷 쓰기 권한이 없습니다 (버킷 권한 설정 확인).' : '');
+  } finally { $('btnUpload').disabled = false; }
+};
+
+boot();
+</script>
+</body>
+</html>
