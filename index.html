@@ -162,6 +162,16 @@ function parse() {
   if (ocr.model) { r.model = ocr.model; if (/^SM-/.test(ocr.model)) r.brand = 'Samsung'; else r.brand = 'Apple'; }
   if (ocr.desc) r.desc = ocr.desc;
   if (r.brand === 'Apple?') r.brand = 'Apple';
+
+  // 삼성: 일련번호 끝 알파벳 제외 후 그 앞 숫자 7자리 (CT7BM1097614N → 1097614)
+  if (r.serial && r.serialSrc === '바코드' && r.brand !== 'Apple') {
+    const m = r.serial.replace(/[A-Z]+$/, '').match(/(\d{7})$/);
+    if (m) {
+      r.serialFull = r.serial;
+      r.serial = m[1];
+      r.brand = r.brand || 'Samsung';
+    }
+  }
   return r;
 }
 
@@ -176,7 +186,9 @@ function render() {
   h += row('모델명', r.model, r.model ? '<span class="src">(글자인식)</span>'
             : '<span class="src">바코드에 없음 → [글자 인식] 사용</span>');
   if (r.desc) h += row('제품', r.desc, '<span class="src">(글자인식)</span>');
-  h += row('일련번호', r.serial, r.serial ? `<span class="src">(${r.serialSrc})</span>` : '');
+  h += row('일련번호', r.serial, r.serialFull
+    ? `<span class="src">(원본 ${r.serialFull})</span>`
+    : r.serial ? `<span class="src">(${r.serialSrc})</span>` : '');
   r.imei.forEach((m, i) => {
     h += row(r.imei.length > 1 ? `IMEI ${i + 1}` : 'IMEI', m,
       luhn(m) ? '<span class="tag ok">체크 OK</span>' : '<span class="tag bad">체크 오류</span>');
