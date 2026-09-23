@@ -77,17 +77,23 @@
 
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 <script type="module">
-import { readBarcodes, prepareZXingModule } from 'https://cdn.jsdelivr.net/npm/zxing-wasm@2.2.4/dist/reader/index.js';
-
-prepareZXingModule({
-  overrides: {
-    locateFile: (p, prefix) => p.endsWith('.wasm')
-      ? 'https://cdn.jsdelivr.net/npm/zxing-wasm@2.2.4/dist/reader/' + p
-      : prefix + p
-  }
-});
-
 const $ = id => document.getElementById(id);
+
+// 바코드 라이브러리는 동적 로딩 — 실패해도 페이지/카메라는 동작하고 오류를 화면에 표시
+const ZX = 'https://cdn.jsdelivr.net/npm/zxing-wasm@2.2.4/dist';
+let readBarcodes = null;
+const libReady = import(ZX + '/es/reader/index.js').then(m => {
+  m.prepareZXingModule({
+    overrides: { locateFile: (p, prefix) => p.endsWith('.wasm') ? ZX + '/reader/' + p : prefix + p },
+    fireImmediately: true
+  });
+  readBarcodes = m.readBarcodes;
+  return true;
+}).catch(e => {
+  $('status').textContent = '바코드 엔진 로딩 실패';
+  $('ocrText').textContent = '바코드 엔진 로딩 실패: ' + e.message + '\n(인터넷 연결 또는 cdn.jsdelivr.net 차단 여부 확인)';
+  return false;
+});
 const video = $('video'), box = $('box'), statusEl = $('status');
 const canvas = document.createElement('canvas');
 const ctx = canvas.getContext('2d', { willReadFrequently: true });
@@ -262,6 +268,7 @@ function grabBox(scale = 1) {
 }
 
 async function loop() {
+  if (!(await libReady)) return;
   while (scanning) {
     const img = grabBox();
     if (img) {
@@ -329,6 +336,7 @@ $('file').onchange = async e => {
   cx.drawImage(bmp, 0, 0, c.width, c.height);
   lastFileCanvas = c;
   $('preview').src = c.toDataURL('image/jpeg', 0.7); $('preview').style.display = 'block';
+  if (!(await libReady)) return;
   const t0 = performance.now();
   const res = await readBarcodes(cx.getImageData(0, 0, c.width, c.height), READ_OPTS);
   addCodes(res); render();
