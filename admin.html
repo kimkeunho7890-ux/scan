@@ -92,12 +92,24 @@
       </div>
       <div class="msg" id="storesMsg"></div>
     </div>
+
+    <!-- 초기화 -->
+    <div class="card" style="border-color:rgba(239,68,68,.45)">
+      <h2 style="color:var(--bad)">데이터 초기화</h2>
+      <div style="display:grid;gap:8px;font-size:14px">
+        <label><input type="checkbox" id="rsSurvey" checked> 입력완료 내역 전체 (조사 결과)</label>
+        <label><input type="checkbox" id="rsStock" checked> 재고리스트</label>
+        <label><input type="checkbox" id="rsStores"> 판매점 목록</label>
+      </div>
+      <button id="btnReset" style="margin-top:12px;width:100%;background:var(--bad)">선택한 데이터 초기화</button>
+      <div class="msg" id="resetMsg"></div>
+    </div>
   </div>
 </main>
 
-<script src="config.js?v=20261013c"></script>
-<script src="appwrite.js?v=20261013c"></script>
-<script src="stock.js?v=20261013c"></script>
+<script src="config.js?v=20261013e"></script>
+<script src="appwrite.js?v=20261013e"></script>
+<script src="stock.js?v=20261013e"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script>
 const $ = id => document.getElementById(id);
@@ -235,19 +247,28 @@ $('btnUpStores').onclick = async () => {
 };
 
 // ================= 입력완료 내역 =================
-let entries = [];   // [{pcode, store, model, serial, serialRaw, matched, at}]
+let entries = [];   // [{pcode, store, model, serial, serialRaw, matched, at}] — 일련번호별 마지막 입력만
+let svDocs = [];    // 원본 전송 문서
 async function loadSurveys() {
   $('svMsg').textContent = ''; $('svInfo').textContent = '불러오는 중...';
   try {
     const docs = await AW.listAll(C.databaseId, C.surveyCollectionId, 500, n => { $('svInfo').textContent = `불러오는 중... ${n}`; });
-    entries = [];
+    entries = []; svDocs = docs;
+    const seen = new Set(); let dupCnt = 0;
     for (const d of docs) {
       let its = []; try { its = JSON.parse(d.items || '[]'); } catch (e) {}
-      for (const x of its) entries.push({ pcode: d.pcode, store: d.pcode === '영업사원' ? `${d.store} (영업사원)` : d.store, model: x.m || '', serial: x.s || '', serialRaw: x.r || x.s || '', matched: !!x.k, at: d.$createdAt });
+      for (const x of its) {
+        const key = Stock.norm(x.s);
+        if (!key) continue;
+        // 문서는 최신순으로 오므로, 처음 나온 것이 마지막 입력 → 같은 일련번호의 이전 입력은 버림
+        if (seen.has(key)) { dupCnt++; continue; }
+        seen.add(key);
+        entries.push({ pcode: d.pcode, store: d.pcode === '영업사원' ? `${d.store} (영업사원)` : d.store, model: x.m || '', serial: x.s || '', serialRaw: x.r || x.s || '', matched: !!x.k, at: d.$createdAt });
+      }
     }
     const stores = new Set(entries.map(e => e.store));
     $('svInfo').textContent = `${docs.length}회 전송`;
-    $('svStats').innerHTML = `<div><b>${entries.length.toLocaleString()}</b>입력 단말</div><div><b>${stores.size}</b>판매점</div><div><b class="${entries.some(e => !e.matched) ? 'warn' : ''}">${entries.filter(e => !e.matched).length}</b>재고 미등록</div>`;
+    $('svStats').innerHTML = `<div><b>${entries.length.toLocaleString()}</b>입력 단말</div><div><b>${stores.size}</b>판매점</div><div><b class="${entries.some(e => !e.matched) ? 'warn' : ''}">${entries.filter(e => !e.matched).length}</b>재고 미등록</div><div><b>${dupCnt}</b>중복 입력 (이전 입력 제외됨)</div>`;
     const MAX = 500;
     $('svBody').innerHTML = entries.length
       ? entries.slice(0, MAX).map((e, i) => `<tr><td class="n">${i + 1}</td><td>${esc(e.store)}</td><td${e.matched ? '' : ' class="warn"'}>${e.matched ? esc(e.model) : '재고 미등록'}</td><td class="mono">${esc(e.serial)}</td></tr>`).join('')
@@ -304,6 +325,42 @@ $('btnDlAll').onclick = async () => {
   } catch (e) {
     $('svMsg').innerHTML = `<span class="bad">전체 다운로드 실패: ${esc(e.message)}</span>` + (e.code === 404 ? ' (재고리스트를 먼저 업로드하세요)' : '');
   } finally { $('btnDlAll').disabled = false; }
+};
+
+
+// ================= 데이터 초기화 =================
+$('btnReset').onclick = async () => {
+  const doSv = $('rsSurvey').checked, doSt = $('rsStock').checked, doSo = $('rsStores').checked;
+  if (!doSv && !doSt && !doSo) return alert('초기화할 항목을 선택하세요');
+  const what = [doSv && '입력완료 내역', doSt && '재고리스트', doSo && '판매점 목록'].filter(Boolean).join(', ');
+  const typed = prompt(`[${what}]을(를) 모두 삭제합니다. 되돌릴 수 없습니다.\n\n계속하려면 "초기화"를 입력하세요.`);
+  if (typed !== '초기화') { $('resetMsg').innerHTML = '<span class="warn">취소되었습니다</span>'; return; }
+  $('btnReset').disabled = true;
+  const log = []; const say = t => { $('resetMsg').textContent = t; };
+  try {
+    if (doSv) {
+      const docs = await AW.listAll(C.databaseId, C.surveyCollectionId, 500, n => say(`입력 내역 확인 중... ${n}`));
+      let done = 0, fail = 0;
+      for (let i = 0; i < docs.length; i += 5) {           // 5건씩 병렬 삭제
+        await Promise.all(docs.slice(i, i + 5).map(d =>
+          AW.deleteDoc(C.databaseId, C.surveyCollectionId, d.$id).then(() => done++).catch(() => fail++)));
+        say(`입력 내역 삭제 중... ${done + fail}/${docs.length}`);
+      }
+      log.push(`입력 내역 ${done}건 삭제` + (fail ? ` (실패 ${fail}건 — 컬렉션 Delete 권한 확인)` : ''));
+    }
+    const delFile = async (b, id, label) => {
+      try { await AW.deleteFile(b, id); log.push(`${label} 삭제`); }
+      catch (e) { log.push(e.code === 404 ? `${label} 없음` : `${label} 삭제 실패: ${e.message}`); }
+    };
+    if (doSt) { await delFile(C.bucketId, C.stockFileId, '재고리스트'); await delFile(C.publicBucketId, C.pubStockFileId, '재고리스트(공개용)'); }
+    if (doSo) await delFile(C.publicBucketId, C.storesFileId, '판매점 목록');
+    $('resetMsg').innerHTML = `<span class="ok">초기화 완료</span> · ${esc(log.join(' · '))}`;
+  } catch (e) {
+    $('resetMsg').innerHTML = `<span class="bad">초기화 실패: ${esc(e.message)}</span>` + (log.length ? ' · ' + esc(log.join(' · ')) : '');
+  } finally {
+    $('btnReset').disabled = false;
+    stockRows = null; showStockInfo(); showStoresInfo(); loadSurveys();
+  }
 };
 
 boot();
