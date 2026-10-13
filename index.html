@@ -59,23 +59,63 @@
   @keyframes flash{from{background:rgba(16,185,129,.35)}to{background:transparent}}
   .empty{color:#555;padding:10px 0}
   .hidden{display:none!important}
+  /* 진입 화면 (로그인처럼) */
+  #entryView{max-width:400px;margin:0 auto;padding:56px 20px 40px}
+  #entryView .logo{width:72px;height:72px;border-radius:18px;display:block;margin:0 auto 14px}
+  #entryView h1{text-align:center;font-size:26px;margin:0 0 6px;letter-spacing:-.5px}
+  #entryView .sub{text-align:center;color:var(--sub);font-size:13px;margin-bottom:26px}
+  .chips{display:flex;gap:8px;justify-content:center;margin-bottom:16px}
+  .chip{border-radius:999px;padding:10px 22px;font-size:15px;font-weight:700;background:transparent;border:1.5px solid var(--line);color:var(--sub)}
+  .chip.on{background:var(--acc);border-color:var(--acc);color:#04261b}
+  .entryBox{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px}
+  .entryBox .go{width:100%;margin-top:10px;background:var(--acc);border-color:var(--acc);color:#04261b;font-size:16px}
+  #recentPick{margin-top:14px;text-align:center;font-size:13px;color:var(--sub)}
+  #recentPick a{color:var(--acc);cursor:pointer;font-weight:700}
+  .who{display:flex;align-items:center;gap:8px;min-width:0}
+  .who .k{font-size:11px;padding:2px 8px;border-radius:999px;background:rgba(16,185,129,.15);color:var(--acc);font-weight:700;white-space:nowrap}
+  .who .k.staff{background:rgba(59,130,246,.15);color:var(--blue)}
+  .who b{font-size:16px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .who code{color:var(--sub);font-size:12px}
+  header a.chg{color:var(--sub);font-size:13px;cursor:pointer;white-space:nowrap;margin-left:8px}
   .toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom));transform:translateX(-50%);background:#111;border:1px solid var(--line);padding:10px 16px;border-radius:10px;font-size:14px;z-index:99;opacity:0;transition:opacity .2s;pointer-events:none;max-width:90vw;text-align:center}
   .toast.show{opacity:1}
 </style>
 </head>
 <body>
 <div id="installBar"><button id="btnInstall">실물 재고조사 앱 설치 (바로가기)</button></div>
-<header><h1>실물 재고조사</h1><span id="cnt" style="font-size:13px;color:var(--sub)"></span></header>
-<main>
-  <label class="fl" for="pcode">P코드 입력</label>
-  <div class="ac">
-    <input type="search" id="pcode" placeholder="P코드 또는 판매점명 2자 이상" autocomplete="off" autocapitalize="characters">
-    <div id="sugg" class="hidden"></div>
+<!-- 진입 화면 -->
+<div id="entryView">
+  <img class="logo" src="icon-192.png" alt="">
+  <h1>실물 재고조사</h1>
+  <div class="sub">조사자를 선택하고 입력하세요</div>
+  <div class="chips">
+    <button class="chip on" id="chipStore">판매점</button>
+    <button class="chip" id="chipStaff">영업사원</button>
   </div>
-  <div id="picked" class="hidden"><span><b id="pkCode"></b><span id="pkName"></span></span><a id="btnUnpick">변경</a></div>
-  <div class="info"><span id="dataInfo">판매점·재고 목록 불러오는 중...</span><a id="btnReload">새로고침</a></div>
+  <div class="entryBox" id="boxStore">
+    <label class="fl" for="pcode">P코드 입력</label>
+    <div class="ac">
+      <input type="search" id="pcode" placeholder="P코드 또는 판매점명 2자 이상" autocomplete="off" autocapitalize="characters">
+      <div id="sugg" class="hidden"></div>
+    </div>
+  </div>
+  <div class="entryBox hidden" id="boxStaff">
+    <label class="fl" for="staffName">영업사원 이름</label>
+    <input type="search" id="staffName" placeholder="이름 입력" autocomplete="off">
+    <button class="go" id="btnStaffGo">시작</button>
+  </div>
+  <div id="recentPick" class="hidden"></div>
+  <div class="info" style="justify-content:center"><span id="dataInfo">판매점·재고 목록 불러오는 중...</span><a id="btnReload">새로고침</a></div>
+</div>
 
-  <div class="cam">
+<!-- 조사 화면 -->
+<div id="scanView" class="hidden">
+<header>
+  <div class="who"><span class="k" id="whoKind">판매점</span><b id="whoName"></b><code id="whoCode"></code></div>
+  <a class="chg" id="btnChange">변경</a>
+</header>
+<main>
+  <div class="cam" style="margin-top:0">
     <video id="video" playsinline muted autoplay></video>
     <div class="box" id="box"></div>
     <div class="camMsg" id="camMsg">[카메라]를 누르면 스캔을 시작합니다</div>
@@ -93,11 +133,12 @@
     <div id="list"><div class="empty">바코드를 비추면 모델명·일련번호가 한 줄씩 쌓입니다</div></div>
   </div>
 </main>
+</div>
 <div class="toast" id="toast"></div>
 
-<script src="config.js?v=20261013b"></script>
-<script src="appwrite.js?v=20261013b"></script>
-<script src="stock.js?v=20261013b"></script>
+<script src="config.js?v=20261013c"></script>
+<script src="appwrite.js?v=20261013c"></script>
+<script src="stock.js?v=20261013c"></script>
 <script type="module">
 const $ = id => document.getElementById(id);
 const C = window.APP_CONFIG;
@@ -145,8 +186,7 @@ async function loadData() {
     msgs.push(`재고 ${rows.length.toLocaleString()}건`);
   } catch (e) { stockIdx = null; msgs.push('재고리스트 없음'); }
   $('dataInfo').textContent = msgs.join(' · ');
-  // 저장돼 있던 판매점 선택 복원
-  try { const p = JSON.parse(localStorage.getItem('survey_pick') || 'null'); if (p) pick(p, true); } catch (e) {}
+  showRecentPick();
   relabel();
 }
 $('btnReload').onclick = loadData;
@@ -182,19 +222,51 @@ inp.addEventListener('keydown', e => {
 });
 sugg.addEventListener('mousedown', e => { const d = e.target.closest('div[data-i]'); if (d) { e.preventDefault(); pick(suggList[+d.dataset.i]); } });
 document.addEventListener('click', e => { if (!e.target.closest('.ac')) sugg.classList.add('hidden'); });
-function pick(s, silent = false) {
-  if (!s) return;
-  picked = { code: s.code, name: s.name };
-  try { localStorage.setItem('survey_pick', JSON.stringify(picked)); } catch (e) {}
-  $('pkCode').textContent = s.code; $('pkName').textContent = s.name;
-  $('picked').classList.remove('hidden'); inp.parentElement.classList.add('hidden'); sugg.classList.add('hidden');
-  inp.value = '';
-  if (!silent) toast(`${s.name} 선택`);
-  updateSend();
+// ================= 진입 / 전환 =================
+function setChip(kind) {
+  $('chipStore').classList.toggle('on', kind === 'store');
+  $('chipStaff').classList.toggle('on', kind === 'staff');
+  $('boxStore').classList.toggle('hidden', kind !== 'store');
+  $('boxStaff').classList.toggle('hidden', kind !== 'staff');
+  setTimeout(() => (kind === 'store' ? inp : $('staffName')).focus(), 50);
 }
-$('btnUnpick').onclick = () => {
-  picked = null; try { localStorage.removeItem('survey_pick'); } catch (e) {}
-  $('picked').classList.add('hidden'); inp.parentElement.classList.remove('hidden'); inp.focus(); updateSend();
+$('chipStore').onclick = () => setChip('store');
+$('chipStaff').onclick = () => setChip('staff');
+
+function enter(p) {   // p = {kind:'store'|'staff', code, name}
+  picked = p;
+  try { localStorage.setItem('survey_pick', JSON.stringify(p)); } catch (e) {}
+  $('whoKind').textContent = p.kind === 'staff' ? '영업사원' : '판매점';
+  $('whoKind').classList.toggle('staff', p.kind === 'staff');
+  $('whoName').textContent = p.name;
+  $('whoCode').textContent = p.kind === 'staff' ? '' : p.code;
+  inp.value = ''; sugg.classList.add('hidden');
+  $('entryView').classList.add('hidden'); $('scanView').classList.remove('hidden');
+  setStatus(''); scrollTo(0, 0); updateSend();
+}
+function pick(s) { if (s) enter({ kind: 'store', code: s.code, name: s.name }); }
+function staffGo() {
+  const n = $('staffName').value.trim();
+  if (n.length < 2) { toast('영업사원 이름을 2자 이상 입력하세요'); $('staffName').focus(); return; }
+  enter({ kind: 'staff', code: '영업사원', name: n });
+}
+$('btnStaffGo').onclick = staffGo;
+$('staffName').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); staffGo(); } });
+
+function showRecentPick() {   // 최근 조사자 바로 이어하기
+  let p = null; try { p = JSON.parse(localStorage.getItem('survey_pick') || 'null'); } catch (e) {}
+  const el = $('recentPick');
+  if (!p || !p.name) { el.classList.add('hidden'); return; }
+  el.innerHTML = `최근: ${p.kind === 'staff' ? '영업사원 ' : esc(p.code) + ' '}${esc(p.name)} · <a id="btnResume">이어서 하기</a>` +
+                 (list.length ? ` <span style="color:var(--warn)">(미전송 ${list.length}건)</span>` : '');
+  el.classList.remove('hidden');
+  $('btnResume').onclick = () => enter(p.kind ? p : { kind: 'store', ...p });
+}
+$('btnChange').onclick = () => {
+  if (camWanted) $('btnCam').click();          // 카메라 끄기
+  picked = null; updateSend();
+  $('scanView').classList.add('hidden'); $('entryView').classList.remove('hidden');
+  showRecentPick(); setChip('store');
 };
 
 // ================= 인식 결과 목록 =================
