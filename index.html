@@ -112,7 +112,7 @@
   </div>
   <div id="recentPick" class="hidden"></div>
   <div class="info" style="justify-content:center"><span id="dataInfo">판매점·재고 목록 불러오는 중...</span><a id="btnReload">새로고침</a></div>
-  <div class="ver">버전 20261013h</div>
+  <div class="ver">버전 20261013i</div>
 </div>
 
 <!-- 조사 화면 -->
@@ -144,9 +144,9 @@
 </div>
 <div class="toast" id="toast"></div>
 
-<script src="config.js?v=20261013h"></script>
-<script src="appwrite.js?v=20261013h"></script>
-<script src="stock.js?v=20261013h"></script>
+<script src="config.js?v=20261013i"></script>
+<script src="appwrite.js?v=20261013i"></script>
+<script src="stock.js?v=20261013i"></script>
 <script type="module">
 const $ = id => document.getElementById(id);
 const C = window.APP_CONFIG;
@@ -303,6 +303,9 @@ function serialsFrom(results) {
     if (/^S[A-Z0-9]{10}$|^S[A-Z0-9]{12}$/.test(t) && /[A-Z]/.test(t.slice(1))) {     // 아이폰 시리얼 바코드 (S+시리얼)
       out.push({ serial: t.slice(1), raw: t.slice(1), cands: [t.slice(1), t] }); continue;
     }
+    // 영문 3자리 + 숫자 10자리 (예: ATM7130156126) → 뒤 6자리 156126
+    const a6 = t.match(/^[A-Z]{3}\d{10}$/);
+    if (a6) { const v = t.slice(-6); out.push({ serial: v, raw: t, cands: [v] }); continue; }
     // 삼성 박스 2D코드(DataMatrix): 영문 3자리 + 일련번호 숫자 7자리 + 검증문자 1자리
     // 예) AXP03995109 → 0399510, AYC0107718. → 0107718
     const dm = t.match(/^[A-Z]{3}(\d{7})[0-9A-Z.]?$/);
