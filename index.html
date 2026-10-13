@@ -136,9 +136,9 @@
 </div>
 <div class="toast" id="toast"></div>
 
-<script src="config.js?v=20261013c"></script>
-<script src="appwrite.js?v=20261013c"></script>
-<script src="stock.js?v=20261013c"></script>
+<script src="config.js?v=20261013e"></script>
+<script src="appwrite.js?v=20261013e"></script>
+<script src="stock.js?v=20261013e"></script>
 <script type="module">
 const $ = id => document.getElementById(id);
 const C = window.APP_CONFIG;
@@ -273,7 +273,10 @@ $('btnChange').onclick = () => {
 let list = [];   // [{model, serial, serialRaw, matched}]
 try { list = JSON.parse(localStorage.getItem('survey_list') || '[]'); } catch (e) {}
 const saveDraft = () => { try { localStorage.setItem('survey_list', JSON.stringify(list)); } catch (e) {} };
-const serial7 = s => { const m = String(s).replace(/[A-Z]+$/, '').match(/(\d{7})$/); return m ? m[1] : null; };
+// 삼성 박스 바코드 = 라벨 인쇄 일련번호(12자리) + 검증문자 1자리 (예: CTLSM0107718+7, CT7BM1097614+N)
+const samsungBase = t => t.length === 13 ? t.slice(0, -1) : t.replace(/[A-Z]+$/, '');
+// 표시용: 인쇄 일련번호의 끝 숫자 7자리 (CTLSM01077187 → 0107718)
+const serial7 = s => { const m = samsungBase(String(s)).match(/(\d{7})$/); return m ? m[1] : null; };
 
 function lookupModel(cands) {
   if (!stockIdx) return { model: '', matched: false };
@@ -294,7 +297,7 @@ function serialsFrom(results) {
     }
     if (/^[A-Z0-9]{10,16}$/.test(t) && /[A-Z]/.test(t) && /\d/.test(t)) {            // 삼성 등
       const s7 = serial7(t);
-      out.push({ serial: s7 || t, raw: t, cands: [t, s7].filter(Boolean) });
+      out.push({ serial: s7 || t, raw: t, cands: [t, samsungBase(t), s7].filter(Boolean) });
     }
   }
   return out;
