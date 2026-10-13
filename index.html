@@ -3,439 +3,335 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>출고 스캔</title>
+<title>실물 재고조사</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#047857">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="재고조사">
 <style>
-  :root{--bg:#0f1115;--card:#1a1d24;--line:#2a2f3a;--txt:#e8eaf0;--sub:#9aa3b2;--acc:#3b82f6;--ok:#22c55e;--warn:#f59e0b;--bad:#ef4444}
-  *{box-sizing:border-box}
+  :root{--bg:#0f1115;--card:#1a1d24;--line:#2a2f3a;--txt:#e8eaf0;--sub:#9aa3b2;--acc:#10b981;--blue:#3b82f6;--ok:#22c55e;--warn:#f59e0b;--bad:#ef4444}
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
   body{margin:0;background:var(--bg);color:var(--txt);font-family:-apple-system,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;font-size:15px}
-  header{padding:10px 16px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;gap:8px}
-  header h1{font-size:17px;margin:0}
-  header .me{font-size:12px;color:var(--sub);text-align:right}
-  header .me a{color:var(--acc);cursor:pointer;margin-left:6px}
-  main{padding:12px 16px 40px;max-width:720px;margin:0 auto}
-  .bar{display:flex;justify-content:space-between;align-items:center;font-size:12px;color:var(--sub);margin-bottom:8px;gap:8px}
-  .bar a{color:var(--acc);cursor:pointer;white-space:nowrap}
-  #status{font-size:12px;color:var(--sub)}
-  .cam{position:relative;background:#000;border-radius:12px;overflow:hidden;aspect-ratio:3/4;max-height:52vh;width:100%}
+  header{padding:12px 16px;padding-top:max(12px,env(safe-area-inset-top));border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between}
+  header h1{font-size:19px;margin:0;letter-spacing:-.3px}
+  main{padding:12px 16px 60px;max-width:720px;margin:0 auto}
+  #installBar{display:none;padding:10px 16px;background:#047857}
+  #installBar button{width:100%;background:#fff;color:#047857;border:0;font-size:16px;font-weight:800;padding:12px;border-radius:10px;font-family:inherit}
+  label.fl{display:block;font-size:13px;color:var(--sub);margin:0 0 6px;font-weight:600}
+  input[type=search]{width:100%;background:#0f1115;color:var(--txt);border:1px solid var(--line);border-radius:10px;padding:13px;font-size:17px;font-family:inherit}
+  .ac{position:relative}
+  #sugg{position:absolute;left:0;right:0;top:100%;margin-top:4px;background:#111827;border:1px solid var(--line);border-radius:10px;max-height:300px;overflow:auto;z-index:20;box-shadow:0 10px 30px rgba(0,0,0,.5)}
+  #sugg div{padding:11px 12px;border-bottom:1px solid var(--line);cursor:pointer;display:flex;gap:10px}
+  #sugg div:last-child{border-bottom:0}
+  #sugg div.on,#sugg div:hover{background:#1f2937}
+  #sugg b{font-family:ui-monospace,Menlo,Consolas,monospace;color:var(--acc);min-width:70px}
+  #sugg .none{color:var(--sub);cursor:default}
+  #picked{margin-top:8px;padding:11px 12px;border-radius:10px;background:rgba(16,185,129,.12);border:1px solid rgba(16,185,129,.4);display:flex;justify-content:space-between;align-items:center;font-size:16px}
+  #picked b{font-family:ui-monospace,Menlo,Consolas,monospace;margin-right:8px;color:var(--acc)}
+  #picked a{color:var(--sub);font-size:13px;cursor:pointer}
+  .info{font-size:12px;color:var(--sub);margin-top:8px;display:flex;justify-content:space-between;gap:8px}
+  .info a{color:var(--blue);cursor:pointer;white-space:nowrap}
+  .cam{position:relative;background:#000;border-radius:12px;overflow:hidden;aspect-ratio:4/3;width:100%;margin-top:12px}
   video{width:100%;height:100%;object-fit:cover;display:block}
-  .box{position:absolute;left:5%;right:5%;top:30%;height:40%;border:2px solid rgba(255,255,255,.85);border-radius:8px;box-shadow:0 0 0 9999px rgba(0,0,0,.35);pointer-events:none;transition:border-color .15s}
+  .box{position:absolute;left:5%;right:5%;top:25%;height:50%;border:2px solid rgba(255,255,255,.85);border-radius:8px;box-shadow:0 0 0 9999px rgba(0,0,0,.35);pointer-events:none;transition:border-color .15s}
   .box.hit{border-color:var(--ok)}
-  .cam .hint{position:absolute;left:0;right:0;bottom:8px;text-align:center;font-size:12px;color:#ddd}
-  .btns{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:12px 0}
-  button,.filebtn{background:var(--card);color:var(--txt);border:1px solid var(--line);border-radius:10px;padding:12px;font-size:15px;font-weight:600;text-align:center;cursor:pointer;font-family:inherit}
-  button.primary{background:var(--acc);border-color:var(--acc)}
-  button.save{background:var(--ok);border-color:var(--ok);color:#06240f;width:100%;margin-top:10px;font-size:16px}
-  button:disabled{opacity:.4}
+  .cam .camMsg{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;padding:20px;color:#ccc;font-size:14px;white-space:pre-line}
+  .btns{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:10px}
+  button,.filebtn{background:var(--card);color:var(--txt);border:1px solid var(--line);border-radius:10px;padding:13px 4px;font-size:15px;font-weight:700;text-align:center;cursor:pointer;font-family:inherit}
   .filebtn input{display:none}
-  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-top:12px}
-  .card h2{font-size:14px;margin:0 0 8px;color:var(--sub);font-weight:600}
-  table{width:100%;border-collapse:collapse}
-  td{padding:7px 0;border-bottom:1px solid var(--line);vertical-align:middle}
-  tr:last-child td{border-bottom:none}
-  td.k{width:84px;color:var(--sub);font-size:13px}
-  td.v{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:15px;word-break:break-all}
-  .src{font-family:inherit;font-size:11px;color:var(--sub);margin-left:6px}
-  .empty{color:#555}
-  .tag{display:inline-block;font-size:11px;padding:2px 7px;border-radius:6px;margin-left:6px;font-family:inherit;font-weight:600}
-  .tag.ok{background:rgba(34,197,94,.15);color:var(--ok)}
-  .tag.bad{background:rgba(239,68,68,.15);color:var(--bad)}
-  .tag.warn{background:rgba(245,158,11,.15);color:var(--warn)}
-  select,input[type=text],input[type=email],input[type=password]{width:100%;background:#0f1115;color:var(--txt);border:1px solid var(--line);border-radius:8px;padding:10px;font-size:15px;font-family:inherit}
-  #modelSel{font-family:ui-monospace,Menlo,Consolas,monospace}
-  #raw div,#recent div{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;padding:6px 0;border-bottom:1px dashed var(--line);word-break:break-all}
-  #recent div b{color:var(--txt)} #recent div span{color:var(--sub)}
-  #raw span.f{color:var(--warn);margin-right:6px}
-  #ocrText{white-space:pre-wrap;font-size:11px;color:var(--sub);max-height:140px;overflow:auto;margin-top:6px}
-  #preview{max-width:100%;border-radius:8px;display:none;margin-top:8px}
-  details summary{cursor:pointer;color:var(--sub);font-size:13px}
-  #loginView{max-width:360px;margin:60px auto;padding:0 16px}
-  #loginView .card{display:grid;gap:10px}
-  #loginMsg{color:var(--bad);font-size:13px;min-height:1em}
+  button.cam-on{background:var(--blue);border-color:var(--blue);color:#fff}
+  button.send{background:var(--acc);border-color:var(--acc);color:#04261b}
+  button:disabled{opacity:.4}
+  #status{font-size:12px;color:var(--sub);margin-top:6px;min-height:1em}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 14px;margin-top:12px}
+  .card h2{font-size:14px;margin:0 0 4px;color:var(--sub);font-weight:600;display:flex;justify-content:space-between}
+  #list .it{display:grid;grid-template-columns:26px 1fr auto 26px;gap:6px;align-items:center;padding:9px 0;border-bottom:1px dashed var(--line)}
+  #list .it:last-child{border-bottom:0}
+  #list .n{color:var(--sub);font-size:12px}
+  #list .m{font-weight:700;word-break:break-all}
+  #list .m.no{color:var(--warn);font-weight:600}
+  #list .s{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:14px}
+  #list .x{background:none;border:0;color:var(--bad);font-size:20px;padding:0;line-height:1}
+  #list .it.new{animation:flash 1s}
+  @keyframes flash{from{background:rgba(16,185,129,.35)}to{background:transparent}}
+  .empty{color:#555;padding:10px 0}
   .hidden{display:none!important}
-  .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#111;border:1px solid var(--line);padding:10px 16px;border-radius:10px;font-size:14px;z-index:9;opacity:0;transition:opacity .2s;pointer-events:none}
+  .toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom));transform:translateX(-50%);background:#111;border:1px solid var(--line);padding:10px 16px;border-radius:10px;font-size:14px;z-index:99;opacity:0;transition:opacity .2s;pointer-events:none;max-width:90vw;text-align:center}
   .toast.show{opacity:1}
 </style>
 </head>
 <body>
-
-<!-- 로그인 -->
-<div id="loginView" class="hidden">
-  <h1 style="font-size:20px">출고 스캔 로그인</h1>
-  <div class="card">
-    <input type="email" id="email" placeholder="이메일" autocomplete="username">
-    <input type="password" id="pw" placeholder="비밀번호" autocomplete="current-password">
-    <button class="primary" id="btnLogin">로그인</button>
-    <div id="loginMsg"></div>
-  </div>
-</div>
-
-<!-- 앱 -->
-<div id="appView" class="hidden">
-<header>
-  <h1>출고 스캔</h1>
-  <div class="me"><span id="meName"></span><a id="btnLogout">로그아웃</a></div>
-</header>
+<div id="installBar"><button id="btnInstall">실물 재고조사 앱 설치 (바로가기)</button></div>
+<header><h1>실물 재고조사</h1><span id="cnt" style="font-size:13px;color:var(--sub)"></span></header>
 <main>
-  <div class="bar"><span id="stockInfo">재고리스트 불러오는 중...</span><a id="btnReloadStock">새로고침</a></div>
-  <div class="bar"><span id="status">준비</span></div>
+  <label class="fl" for="pcode">P코드 입력</label>
+  <div class="ac">
+    <input type="search" id="pcode" placeholder="P코드 또는 판매점명 2자 이상" autocomplete="off" autocapitalize="characters">
+    <div id="sugg" class="hidden"></div>
+  </div>
+  <div id="picked" class="hidden"><span><b id="pkCode"></b><span id="pkName"></span></span><a id="btnUnpick">변경</a></div>
+  <div class="info"><span id="dataInfo">판매점·재고 목록 불러오는 중...</span><a id="btnReload">새로고침</a></div>
 
   <div class="cam">
-    <video id="video" playsinline muted></video>
+    <video id="video" playsinline muted autoplay></video>
     <div class="box" id="box"></div>
-    <div class="hint">라벨 바코드를 흰 박스 안에 가로로 맞춰주세요</div>
+    <div class="camMsg" id="camMsg">[카메라]를 누르면 스캔을 시작합니다</div>
   </div>
-
   <div class="btns">
-    <button class="primary" id="btnCam">카메라 시작</button>
-    <button id="btnTorch" disabled>플래시</button>
-    <button id="btnOcr" disabled>글자 인식 (모델명)</button>
-    <button id="btnReset">초기화</button>
-    <label class="filebtn" style="grid-column:1/-1">사진 파일로 테스트
-      <input type="file" id="file" accept="image/*">
-    </label>
+    <button id="btnCam">카메라</button>
+    <label class="filebtn">사진파일<input type="file" id="file" accept="image/*"></label>
+    <button class="send" id="btnSend" disabled>입력완료</button>
+    <button id="btnClear">초기화</button>
   </div>
+  <div id="status"></div>
 
   <div class="card">
-    <h2>인식 결과 <span id="matchTag"></span></h2>
-    <table>
-      <tr><td class="k">모델명</td><td><select id="modelSel"><option value="">— 모델 선택 —</option></select>
-        <div id="modelNote" class="src" style="margin:4px 0 0"></div></td></tr>
-      <tr><td class="k">출고가</td><td class="v" id="priceCell"><span class="empty">-</span></td></tr>
-    </table>
-    <table id="result"></table>
-    <div style="margin-top:10px"><input type="text" id="memo" placeholder="출고처 / 메모 (선택)"></div>
-    <button class="save" id="btnSave" disabled>저장</button>
-  </div>
-
-  <div class="card">
-    <h2>최근 저장 (<span id="recentCnt">0</span>)</h2>
-    <div id="recent"><span class="empty">-</span></div>
-  </div>
-
-  <div class="card">
-    <details>
-      <summary>읽힌 바코드 원본 (<span id="rawCnt">0</span>)</summary>
-      <div id="raw"></div>
-      <img id="preview" alt="">
-      <div id="ocrText"></div>
-    </details>
+    <h2><span>인식 결과</span><span id="listCnt">0건</span></h2>
+    <div id="list"><div class="empty">바코드를 비추면 모델명·일련번호가 한 줄씩 쌓입니다</div></div>
   </div>
 </main>
-</div>
 <div class="toast" id="toast"></div>
 
 <script src="config.js"></script>
 <script src="appwrite.js"></script>
 <script src="stock.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 <script type="module">
 const $ = id => document.getElementById(id);
 const C = window.APP_CONFIG;
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+function toast(t, ms = 1800) { const el = $('toast'); el.textContent = t; el.classList.add('show'); clearTimeout(toast._t); toast._t = setTimeout(() => el.classList.remove('show'), ms); }
+const setStatus = t => { $('status').textContent = t; };
 
-// ---------- 바코드 엔진 (동적 로딩) ----------
+// ================= 앱 설치 =================
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+const isStandalone = () => matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+let installed = false; try { installed = localStorage.getItem('survey_installed') === '1'; } catch (e) {}
+let deferredPrompt = null;
+const updateInstallBar = () => { $('installBar').style.display = (!isStandalone() && !installed && (deferredPrompt || isIOS)) ? 'block' : 'none'; };
+addEventListener('beforeinstallprompt', e => { e.preventDefault(); deferredPrompt = e; installed = false; updateInstallBar(); });
+addEventListener('appinstalled', () => { installed = true; deferredPrompt = null; try { localStorage.setItem('survey_installed', '1'); } catch (e) {} updateInstallBar(); toast('설치 완료 — 홈 화면에서 실행하세요'); });
+$('btnInstall').onclick = async () => {
+  if (deferredPrompt) {
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    if (outcome === 'accepted') { installed = true; try { localStorage.setItem('survey_installed', '1'); } catch (e) {} }
+    deferredPrompt = null; updateInstallBar();
+  } else if (isIOS) toast('Safari 하단 [공유] → [홈 화면에 추가]를 누르세요', 4000);
+};
+updateInstallBar();
+
+// ================= 데이터 (판매점 / 재고) =================
+let stores = [];           // [{code, name}]
+let stockIdx = null;       // 일련번호 → 모델명
+let picked = null;         // {code, name}
+
+function parseTable(text) { return Stock.parseCSV(String(text).replace(/^﻿/, '')); }
+async function loadData() {
+  $('dataInfo').textContent = '판매점·재고 목록 불러오는 중...';
+  const msgs = [];
+  try {
+    const t = parseTable(await AW.fileText(C.publicBucketId, C.storesFileId));
+    stores = t.slice(1).map(r => ({ code: String(r[0] || '').trim(), name: String(r[1] || '').trim() })).filter(s => s.code || s.name);
+    msgs.push(`판매점 ${stores.length.toLocaleString()}곳`);
+  } catch (e) { msgs.push('판매점 목록 없음'); }
+  try {
+    const rows = Stock.toStockRows(parseTable(await AW.fileText(C.publicBucketId, C.pubStockFileId)));
+    stockIdx = Stock.buildIndex(rows);
+    msgs.push(`재고 ${rows.length.toLocaleString()}건`);
+  } catch (e) { stockIdx = null; msgs.push('재고리스트 없음'); }
+  $('dataInfo').textContent = msgs.join(' · ');
+  // 저장돼 있던 판매점 선택 복원
+  try { const p = JSON.parse(localStorage.getItem('survey_pick') || 'null'); if (p) pick(p, true); } catch (e) {}
+  relabel();
+}
+$('btnReload').onclick = loadData;
+
+// ================= P코드 자동완성 =================
+const inp = $('pcode'), sugg = $('sugg');
+let suggList = [], suggOn = 0;
+function showSugg() {
+  const q = inp.value.trim().toUpperCase();
+  if (q.length < 2) { sugg.classList.add('hidden'); return; }
+  const starts = [], contains = [];
+  for (const s of stores) {
+    const c = s.code.toUpperCase(), n = s.name.toUpperCase();
+    if (c.startsWith(q) || n.startsWith(q)) starts.push(s);
+    else if (c.includes(q) || n.includes(q)) contains.push(s);
+    if (starts.length >= 30) break;
+  }
+  suggList = starts.concat(contains).slice(0, 30); suggOn = 0;
+  sugg.innerHTML = suggList.length
+    ? suggList.map((s, i) => `<div data-i="${i}" class="${i === 0 ? 'on' : ''}"><b>${esc(s.code)}</b><span>${esc(s.name)}</span></div>`).join('')
+    : `<div class="none">${stores.length ? '일치하는 판매점이 없습니다' : '판매점 목록이 아직 등록되지 않았습니다'}</div>`;
+  sugg.classList.remove('hidden');
+}
+inp.addEventListener('input', showSugg);
+inp.addEventListener('focus', showSugg);
+inp.addEventListener('keydown', e => {
+  if (sugg.classList.contains('hidden') || !suggList.length) return;
+  if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+    e.preventDefault();
+    suggOn = (suggOn + (e.key === 'ArrowDown' ? 1 : -1) + suggList.length) % suggList.length;
+    sugg.querySelectorAll('div').forEach((d, i) => d.classList.toggle('on', i === suggOn));
+  } else if (e.key === 'Enter') { e.preventDefault(); pick(suggList[suggOn]); }
+});
+sugg.addEventListener('mousedown', e => { const d = e.target.closest('div[data-i]'); if (d) { e.preventDefault(); pick(suggList[+d.dataset.i]); } });
+document.addEventListener('click', e => { if (!e.target.closest('.ac')) sugg.classList.add('hidden'); });
+function pick(s, silent = false) {
+  if (!s) return;
+  picked = { code: s.code, name: s.name };
+  try { localStorage.setItem('survey_pick', JSON.stringify(picked)); } catch (e) {}
+  $('pkCode').textContent = s.code; $('pkName').textContent = s.name;
+  $('picked').classList.remove('hidden'); inp.parentElement.classList.add('hidden'); sugg.classList.add('hidden');
+  inp.value = '';
+  if (!silent) toast(`${s.name} 선택`);
+  updateSend();
+}
+$('btnUnpick').onclick = () => {
+  picked = null; try { localStorage.removeItem('survey_pick'); } catch (e) {}
+  $('picked').classList.add('hidden'); inp.parentElement.classList.remove('hidden'); inp.focus(); updateSend();
+};
+
+// ================= 인식 결과 목록 =================
+let list = [];   // [{model, serial, serialRaw, matched}]
+try { list = JSON.parse(localStorage.getItem('survey_list') || '[]'); } catch (e) {}
+const saveDraft = () => { try { localStorage.setItem('survey_list', JSON.stringify(list)); } catch (e) {} };
+const serial7 = s => { const m = String(s).replace(/[A-Z]+$/, '').match(/(\d{7})$/); return m ? m[1] : null; };
+
+function lookupModel(cands) {
+  if (!stockIdx) return { model: '', matched: false };
+  const m = stockIdx.find(cands);
+  return m.rows.length ? { model: m.rows.map(r => r.model).filter((v, i, a) => a.indexOf(v) === i).join(' / '), matched: true } : { model: '', matched: false };
+}
+// 바코드 묶음에서 일련번호만 추출
+function serialsFrom(results) {
+  const out = [];
+  for (const b of results) {
+    if (!b.isValid || !b.text) continue;
+    const t = b.text.trim();
+    const ap = t.match(/boxinfo\.apple\.com\/.*?\/21\/([A-Z0-9]+)/i);              // 아이폰 박스 QR
+    if (ap) { out.push({ serial: ap[1].toUpperCase(), raw: ap[1].toUpperCase(), cands: [ap[1]] }); continue; }
+    if (/^\d+$/.test(t) || /^89\d{30}$/.test(t)) continue;                          // IMEI·EID·EAN 제외
+    if (/^S[A-Z0-9]{10}$|^S[A-Z0-9]{12}$/.test(t) && /[A-Z]/.test(t.slice(1))) {     // 아이폰 시리얼 바코드 (S+시리얼)
+      out.push({ serial: t.slice(1), raw: t.slice(1), cands: [t.slice(1), t] }); continue;
+    }
+    if (/^[A-Z0-9]{10,16}$/.test(t) && /[A-Z]/.test(t) && /\d/.test(t)) {            // 삼성 등
+      const s7 = serial7(t);
+      out.push({ serial: s7 || t, raw: t, cands: [t, s7].filter(Boolean) });
+    }
+  }
+  return out;
+}
+function addSerials(found) {
+  let added = 0;
+  for (const f of found) {
+    if (list.some(x => x.serial === f.serial)) continue;
+    const { model, matched } = lookupModel(f.cands);
+    list.push({ model, serial: f.serial, serialRaw: f.raw, matched, _new: true });
+    added++;
+  }
+  if (added) {
+    $('box').classList.add('hit'); setTimeout(() => $('box').classList.remove('hit'), 250);
+    navigator.vibrate?.(70); beep();
+    saveDraft(); renderList();
+  }
+  return added;
+}
+function renderList() {
+  const el = $('list');
+  if (!list.length) el.innerHTML = '<div class="empty">바코드를 비추면 모델명·일련번호가 한 줄씩 쌓입니다</div>';
+  else el.innerHTML = list.map((x, i) => `<div class="it${x._new ? ' new' : ''}"><span class="n">${i + 1}</span>
+      <span class="m${x.matched ? '' : ' no'}">${x.matched ? esc(x.model) : '재고 미등록'}</span>
+      <span class="s">${esc(x.serial)}</span><button class="x" data-i="${i}" aria-label="삭제">×</button></div>`).reverse().join('');
+  list.forEach(x => delete x._new);
+  el.querySelectorAll('.x').forEach(b => b.onclick = () => { list.splice(+b.dataset.i, 1); saveDraft(); renderList(); });
+  $('listCnt').textContent = list.length + '건';
+  updateSend();
+}
+function relabel() {   // 재고리스트가 늦게 로드된 경우 모델명 다시 채움
+  let ch = false;
+  for (const x of list) if (!x.matched) { const r = lookupModel([x.serialRaw, x.serial]); if (r.matched) { Object.assign(x, r); ch = true; } }
+  if (ch) saveDraft(); renderList();
+}
+function updateSend() { $('btnSend').disabled = !(picked && list.length); }
+
+let actx;
+function beep(f = 1800) {
+  try { actx = actx || new (window.AudioContext || window.webkitAudioContext)();
+    const o = actx.createOscillator(), g = actx.createGain(); o.frequency.value = f; g.gain.value = 0.08;
+    o.connect(g); g.connect(actx.destination); o.start(); o.stop(actx.currentTime + 0.08); } catch (e) {}
+}
+
+// ================= 바코드 엔진 =================
 const ZX = 'https://cdn.jsdelivr.net/npm/zxing-wasm@2.2.4/dist';
 let readBarcodes = null;
 const libReady = import(ZX + '/es/reader/index.js').then(m => {
-  m.prepareZXingModule({
-    overrides: { locateFile: (p, prefix) => p.endsWith('.wasm') ? ZX + '/reader/' + p : prefix + p },
-    fireImmediately: true
-  });
-  readBarcodes = m.readBarcodes;
-  return true;
+  m.prepareZXingModule({ overrides: { locateFile: (p, prefix) => p.endsWith('.wasm') ? ZX + '/reader/' + p : prefix + p }, fireImmediately: true });
+  readBarcodes = m.readBarcodes; return true;
 }).catch(e => { setStatus('바코드 엔진 로딩 실패: ' + e.message); return false; });
+const READ_OPTS = { tryHarder: true, tryInvert: true, tryRotate: true, maxNumberOfSymbols: 20, formats: ['Code128', 'Code39', 'QRCode', 'DataMatrix'] };
 
+// ================= 카메라 =================
 const video = $('video'), box = $('box');
 const canvas = document.createElement('canvas');
 const ctx = canvas.getContext('2d', { willReadFrequently: true });
-const READ_OPTS = {
-  tryHarder: true, tryInvert: true, tryRotate: true, maxNumberOfSymbols: 20,
-  formats: ['Code128', 'Code39', 'EAN-13', 'UPC-A', 'QRCode', 'DataMatrix']
-};
+let stream = null, track = null, scanning = false, camToken = 0, camWanted = false;
+const camMsg = t => { $('camMsg').textContent = t || ''; $('camMsg').classList.toggle('hidden', !t); };
 
-// ---------- 상태 ----------
-let user = null;
-let stockIdx = null;               // 재고 인덱스
-let codes = new Map();             // 바코드 text -> format
-let ocr = { model: null, desc: null };
-let modelManual = false;           // 사용자가 모델을 직접 바꿨는지
-let cur = null;                    // 현재 판별 결과 + 매칭 결과
-let stream = null, track = null, scanning = false, torchOn = false;
-
-const setStatus = t => { $('status').textContent = t; };
-function toast(t) { const el = $('toast'); el.textContent = t; el.classList.add('show'); clearTimeout(toast._t); toast._t = setTimeout(() => el.classList.remove('show'), 1800); }
-const won = n => n ? Number(n).toLocaleString('ko-KR') + '원' : '-';
-const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-
-// ================= 로그인 =================
-async function boot() {
-  try { user = await AW.me(); } catch (e) { user = null; }
-  if (!user) { $('loginView').classList.remove('hidden'); $('appView').classList.add('hidden'); return; }
-  $('loginView').classList.add('hidden'); $('appView').classList.remove('hidden');
-  $('meName').textContent = user.name || user.email;
-  loadStock();
-  loadRecent();
-  render();
-}
-$('btnLogin').onclick = async () => {
-  $('loginMsg').textContent = '';
-  try { await AW.login($('email').value.trim(), $('pw').value); boot(); }
-  catch (e) { $('loginMsg').textContent = '로그인 실패: ' + e.message; }
-};
-$('pw').addEventListener('keydown', e => { if (e.key === 'Enter') $('btnLogin').click(); });
-$('btnLogout').onclick = async () => { stopCam(); await AW.logout(); location.reload(); };
-
-// ================= 재고리스트 =================
-const CACHE_KEY = 'stock_cache_' + C.projectId;
-async function loadStock(force = false) {
-  $('stockInfo').textContent = '재고리스트 불러오는 중...';
-  try {
-    const meta = await AW.fileMeta(C.bucketId, C.stockFileId);
-    let text = null;
-    if (!force) {
-      try { const c = JSON.parse(localStorage.getItem(CACHE_KEY) || 'null');
-            if (c && c.updatedAt === meta.$updatedAt) text = c.text; } catch (e) {}
-    }
-    if (!text) {
-      text = await AW.fileText(C.bucketId, C.stockFileId);
-      try { localStorage.setItem(CACHE_KEY, JSON.stringify({ updatedAt: meta.$updatedAt, text })); } catch (e) {}
-    }
-    const rows = Stock.toStockRows(Stock.parseCSV(text));
-    stockIdx = Stock.buildIndex(rows);
-    fillModelSelect();
-    const d = new Date(meta.$updatedAt);
-    $('stockInfo').textContent = `재고 ${rows.length.toLocaleString()}건 · ${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')} 등록본`;
-    render();
-  } catch (e) {
-    stockIdx = null;
-    $('stockInfo').textContent = e.code === 404 ? '등록된 재고리스트 없음 (admin.html에서 등록)' : '재고리스트 오류: ' + e.message;
-  }
-}
-$('btnReloadStock').onclick = () => loadStock(true);
-
-function fillModelSelect() {
-  const sel = $('modelSel'), v = sel.value;
-  sel.innerHTML = '<option value="">— 모델 선택 —</option>' +
-    (stockIdx?.models || []).map(m => `<option>${esc(m)}</option>`).join('');
-  if (v) setModel(v);
-}
-function setModel(m) {
-  const sel = $('modelSel');
-  if (m && ![...sel.options].some(o => o.value === m)) sel.add(new Option(m + ' (재고 외)', m));
-  sel.value = m || '';
-}
-$('modelSel').onchange = () => { modelManual = true; render(); };
-
-// ================= 판별 로직 =================
-function luhn(n) {
-  let s = 0;
-  [...n].reverse().forEach((c, i) => { let d = +c; if (i % 2) { d *= 2; if (d > 9) d -= 9; } s += d; });
-  return s % 10 === 0;
-}
-
-function parse() {
-  const r = { brand: null, serial: null, serialFull: null, serialSrc: null, imei: [], eid: null, gtin: null };
-  const imeiSet = new Set();
-  for (const [text, fmt] of codes) {
-    const t = text.trim();
-    const ap = t.match(/boxinfo\.apple\.com\/.*?\/01\/(\d{14})\/21\/([A-Z0-9]+)(?:\?(.*))?/i);
-    if (ap) {
-      r.brand = 'Apple'; r.gtin = ap[1].replace(/^0+/, ''); r.serial = ap[2]; r.serialSrc = 'QR';
-      const q = new URLSearchParams(ap[3] || '');
-      ['8040', '8041'].forEach(k => q.get(k) && imeiSet.add(q.get(k)));
-      if (q.get('8042')) r.eid = q.get('8042');
-      continue;
-    }
-    if (/^\d{15}$/.test(t)) { imeiSet.add(t); continue; }
-    if (/^89\d{30}$/.test(t)) { r.eid = r.eid || t; continue; }
-    if (/^(EAN-13|UPC-A)$/.test(fmt) || /^\d{12,14}$/.test(t)) { r.gtin = r.gtin || t.replace(/^0+/, ''); continue; }
-    if (/^S[A-Z0-9]{10}$|^S[A-Z0-9]{12}$/.test(t) && /[A-Z]/.test(t.slice(1)) && !r.serial) {
-      r.serial = t.slice(1); r.serialSrc = '바코드'; r.brand = r.brand || 'Apple?'; continue;
-    }
-    if (/^[A-Z0-9]{10,16}$/.test(t) && /[A-Z]/.test(t) && /\d/.test(t) && !r.serial) {
-      r.serial = t; r.serialSrc = '바코드'; continue;
-    }
-  }
-  r.imei = [...imeiSet];
-  if (r.gtin && /^8806/.test(r.gtin)) r.brand = r.brand || 'Samsung';
-  if (r.gtin && /^19\d/.test(r.gtin)) r.brand = 'Apple';
-  if (ocr.model) r.brand = /^SM-/.test(ocr.model) ? 'Samsung' : 'Apple';
-  if (r.brand === 'Apple?') r.brand = 'Apple';
-
-  // 삼성: 끝 알파벳 제외 후 숫자 7자리 (CT7BM1097614N → 1097614)
-  if (r.serial && r.serialSrc === '바코드' && r.brand !== 'Apple') {
-    const m = r.serial.replace(/[A-Z]+$/, '').match(/(\d{7})$/);
-    if (m) { r.serialFull = r.serial; r.serial = m[1]; r.brand = r.brand || 'Samsung'; }
-  }
-
-  // 재고 매칭
-  r.match = { rows: [] };
-  if (stockIdx && r.serial) {
-    const cands = [r.serialFull, r.serial].filter(Boolean);
-    // 아이폰 시리얼은 'S' 붙은 원본도 같이 조회
-    for (const [t] of codes) if (/^S[A-Z0-9]{10,12}$/.test(t)) cands.push(t);
-    r.match = stockIdx.find(cands);
-  }
-  return r;
-}
-
-function row(k, v, extra = '') {
-  return `<tr><td class="k">${k}</td><td class="v">${v ? esc(v) : '<span class="empty">-</span>'}${extra}</td></tr>`;
-}
-
-function render() {
-  cur = parse();
-  const r = cur, mr = r.match.rows;
-
-  // 모델 자동 선택
-  if (!modelManual) {
-    if (mr.length) setModel(mr[0].model);
-    else if (ocr.model) setModel(ocr.model);
-    else setModel('');
-  }
-  const model = $('modelSel').value;
-  const hitRow = mr.find(x => x.model === model);
-
-  // 매칭 뱃지 / 안내
-  let tag = '', note = '';
-  if (!r.serial) tag = '';
-  else if (!stockIdx) tag = '<span class="tag warn">재고리스트 없음</span>';
-  else if (mr.length === 1) tag = '<span class="tag ok">재고 일치</span>';
-  else if (mr.length > 1) { tag = `<span class="tag warn">후보 ${mr.length}건</span>`;
-    note = '같은 일련번호가 여러 모델에 있음: ' + mr.map(x => x.model).join(', '); }
-  else { tag = '<span class="tag bad">재고 미등록</span>'; note = '재고리스트에 없는 일련번호입니다. 모델을 직접 선택하세요.'; }
-  if (modelManual && model) note = (note ? note + ' · ' : '') + '직접 선택됨';
-  $('matchTag').innerHTML = tag;
-  $('modelNote').textContent = note;
-
-  // 출고가
-  const price = hitRow?.price || (model && stockIdx?.modelPrice.get(model)) || 0;
-  $('priceCell').innerHTML = price ? won(price) + (hitRow ? '' : '<span class="src">(모델 기준)</span>') : '<span class="empty">-</span>';
-  cur.price = price; cur.model = model; cur.matched = !!hitRow;
-
-  let h = '';
-  h += row('제조사', r.brand);
-  h += row('일련번호', r.serial, r.serialFull ? `<span class="src">(원본 ${esc(r.serialFull)})</span>`
-                                  : r.serial ? `<span class="src">(${r.serialSrc})</span>` : '');
-  r.imei.forEach((m, i) => h += row(r.imei.length > 1 ? `IMEI ${i + 1}` : 'IMEI', m,
-      luhn(m) ? '<span class="tag ok">체크 OK</span>' : '<span class="tag bad">체크 오류</span>'));
-  if (!r.imei.length) h += row('IMEI', null);
-  h += row('EID', r.eid);
-  h += row('EAN/UPC', r.gtin);
-  $('result').innerHTML = h;
-
-  $('btnSave').disabled = !(r.serial && model);
-  $('rawCnt').textContent = codes.size;
-  $('raw').innerHTML = [...codes].map(([t, f]) => `<div><span class="f">${f}</span>${esc(t)}</div>`).join('');
-}
-
-function addCodes(list) {
-  let added = 0;
-  for (const b of list) {
-    if (!b.isValid || !b.text) continue;
-    if (!codes.has(b.text)) { codes.set(b.text, b.format); added++; }
-  }
-  if (added) {
-    box.classList.add('hit'); setTimeout(() => box.classList.remove('hit'), 250);
-    navigator.vibrate?.(60); beep(); render();
-  }
-}
-
-let actx;
-function beep(f = 1500) {
-  try {
-    actx = actx || new (window.AudioContext || window.webkitAudioContext)();
-    const o = actx.createOscillator(), g = actx.createGain();
-    o.frequency.value = f; g.gain.value = 0.08;
-    o.connect(g); g.connect(actx.destination); o.start(); o.stop(actx.currentTime + 0.08);
-  } catch (e) {}
-}
-
-function resetItem() {
-  codes.clear(); ocr = { model: null, desc: null }; modelManual = false;
-  $('ocrText').textContent = ''; $('preview').style.display = 'none'; // 메모는 유지 (같은 출고처 연속 스캔)
-  render();
-}
-$('btnReset').onclick = resetItem;
-
-// ================= 저장 =================
-$('btnSave').onclick = async () => {
-  const r = cur; if (!r?.serial || !r.model) return;
-  $('btnSave').disabled = true;
-  try {
-    const dup = await AW.listDocs(C.databaseId, C.collectionId, [AW.Q.equal('serial', r.serial), AW.Q.limit(1)]);
-    if (dup.total > 0) {
-      const d = dup.documents[0];
-      if (!confirm(`이미 저장된 일련번호입니다.\n(${d.model} · ${new Date(d.$createdAt).toLocaleString('ko-KR')})\n그래도 저장할까요?`)) { render(); return; }
-    }
-    const doc = await AW.createDoc(C.databaseId, C.collectionId, {
-      model: r.model,
-      serial: r.serial,
-      serialRaw: r.serialFull || r.serial,
-      price: r.price ? Math.round(r.price) : null,
-      imei1: r.imei[0] || '',
-      imei2: r.imei[1] || '',
-      eid: r.eid || '',
-      gtin: r.gtin || '',
-      matched: !!r.matched,
-      memo: $('memo').value.trim(),
-      scannedBy: user.email,
-      raw: JSON.stringify([...codes]).slice(0, 2000)
-    });
-    beep(2200); toast('저장됨: ' + r.model + ' / ' + r.serial);
-    addRecent(doc, true);
-    resetItem();
-  } catch (e) {
-    alert('저장 실패: ' + e.message);
-    render();
-  }
-};
-
-async function loadRecent() {
-  try {
-    const res = await AW.listDocs(C.databaseId, C.collectionId, [AW.Q.orderDesc('$createdAt'), AW.Q.limit(20)]);
-    $('recent').innerHTML = '';
-    res.documents.forEach(d => addRecent(d));
-    $('recentCnt').textContent = res.total;
-  } catch (e) {
-    $('recent').innerHTML = `<span class="empty">불러오기 실패: ${esc(e.message)}</span>`;
-  }
-}
-function addRecent(d, top = false) {
-  const el = document.createElement('div');
-  const t = new Date(d.$createdAt);
-  el.innerHTML = `<b>${esc(d.model)}</b> ${esc(d.serial)} <span>${won(d.price)} · ${t.getMonth() + 1}/${t.getDate()} ${String(t.getHours()).padStart(2, '0')}:${String(t.getMinutes()).padStart(2, '0')}${d.memo ? ' · ' + esc(d.memo) : ''}${d.matched ? '' : ' · 재고외'}</span>`;
-  const box = $('recent');
-  if (box.querySelector('.empty')) box.innerHTML = '';
-  top ? box.prepend(el) : box.append(el);
-  if (top) $('recentCnt').textContent = (+$('recentCnt').textContent || 0) + 1;
-}
-
-// ================= 카메라 =================
 async function startCam() {
-  if (stream) { stopCam(); return; }
-  if (!navigator.mediaDevices?.getUserMedia) { setStatus('이 브라우저는 카메라를 지원하지 않습니다 (HTTPS/인앱브라우저 확인)'); return; }
-  try {
-    stream = await navigator.mediaDevices.getUserMedia({
-      audio: false, video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } }
-    });
-  } catch (e) { setStatus('카메라 권한 실패: ' + e.name); return; }
-  video.srcObject = stream; await video.play();
-  track = stream.getVideoTracks()[0];
+  stopCam(false);
+  const my = ++camToken;
+  if (!navigator.mediaDevices?.getUserMedia) { camMsg('이 브라우저는 카메라를 지원하지 않습니다.\n(카카오톡 내장 브라우저라면 크롬/삼성인터넷으로 여세요)'); return; }
+  camMsg('카메라 켜는 중...');
+  const tries = [
+    { audio: false, video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } } },
+    { audio: false, video: { facingMode: 'environment' } },
+    { audio: false, video: true }
+  ];
+  let s = null, lastErr = null;
+  for (const c of tries) {
+    try { s = await navigator.mediaDevices.getUserMedia(c); break; }
+    catch (e) { lastErr = e; if (e.name === 'NotAllowedError' || e.name === 'SecurityError') break; await sleep(400); }
+  }
+  if (my !== camToken) { s?.getTracks().forEach(t => t.stop()); return; }
+  if (!s) {
+    const n = lastErr?.name;
+    camMsg(n === 'NotAllowedError' ? '카메라 권한이 차단되어 있습니다.\n주소창 왼쪽 아이콘 → 권한 → 카메라 허용 후\n[카메라]를 다시 누르세요.'
+         : n === 'NotReadableError' ? '다른 앱이 카메라를 사용 중입니다.\n다른 앱을 닫고 [카메라]를 다시 누르세요.'
+         : '카메라를 열 수 없습니다: ' + (n || lastErr?.message));
+    camWanted = false; $('btnCam').classList.remove('cam-on'); $('btnCam').textContent = '카메라';
+    return;
+  }
+  stream = s; track = s.getVideoTracks()[0];
+  track.addEventListener('ended', () => { if (my === camToken) { stopCam(false); camMsg('카메라가 중지되었습니다.\n[카메라]를 다시 누르세요.'); } });
+  video.srcObject = s;
+  try { await video.play(); } catch (e) {}
+  camMsg('');
   try { await track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] }); } catch (e) {}
-  const caps = track.getCapabilities?.() || {};
-  $('btnTorch').disabled = !caps.torch;
-  $('btnOcr').disabled = false;
-  $('btnCam').textContent = '카메라 정지';
-  const s = track.getSettings(); setStatus(`카메라 ${s.width}×${s.height}`);
-  scanning = true; loop();
+  scanning = true; loop(my);
 }
-function stopCam() {
-  scanning = false;
-  stream?.getTracks().forEach(t => t.stop());
-  stream = null; track = null; torchOn = false;
-  $('btnCam').textContent = '카메라 시작'; $('btnTorch').disabled = true;
-  setStatus('정지');
+function stopCam(userAction = true) {
+  camToken++; scanning = false;
+  if (stream) stream.getTracks().forEach(t => t.stop());
+  stream = null; track = null;
+  try { video.pause(); } catch (e) {}
+  video.srcObject = null;
+  if (userAction) { camMsg('[카메라]를 누르면 스캔을 시작합니다'); setStatus(''); }
 }
+$('btnCam').onclick = () => {
+  camWanted = !camWanted;
+  $('btnCam').classList.toggle('cam-on', camWanted);
+  $('btnCam').textContent = camWanted ? '카메라 끄기' : '카메라';
+  camWanted ? startCam() : stopCam();
+};
+document.addEventListener('visibilitychange', () => { if (document.hidden) stopCam(false); else if (camWanted) startCam(); });
+addEventListener('pagehide', () => stopCam(false));
+
 function grabBox() {
   const vw = video.videoWidth, vh = video.videoHeight; if (!vw) return null;
   const el = video.getBoundingClientRect(), bx = box.getBoundingClientRect();
@@ -443,71 +339,66 @@ function grabBox() {
   const ox = (el.width - vw * k) / 2, oy = (el.height - vh * k) / 2;
   const sx = Math.max(0, (bx.left - el.left - ox) / k), sy = Math.max(0, (bx.top - el.top - oy) / k);
   const sw = Math.min(vw - sx, bx.width / k), sh = Math.min(vh - sy, bx.height / k);
+  if (sw < 10 || sh < 10) return null;
   canvas.width = Math.round(sw); canvas.height = Math.round(sh);
   ctx.drawImage(video, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height);
   return ctx.getImageData(0, 0, canvas.width, canvas.height);
 }
-async function loop() {
+async function loop(my) {
   if (!(await libReady)) return;
-  while (scanning) {
+  while (scanning && my === camToken) {
     const img = grabBox();
     if (img) {
-      const t0 = performance.now();
-      try { addCodes(await readBarcodes(img, READ_OPTS)); } catch (e) { setStatus('인식 오류: ' + e.message); }
-      if (scanning) setStatus(`스캔 중 · ${Math.round(performance.now() - t0)}ms/프레임`);
+      try { const res = await readBarcodes(img, READ_OPTS); if (my === camToken) addSerials(serialsFrom(res)); }
+      catch (e) { setStatus('인식 오류: ' + e.message); }
+      if (scanning && my === camToken) setStatus(`스캔 중 · ${list.length}건`);
     }
-    await new Promise(r => setTimeout(r, 120));
+    await sleep(120);
   }
 }
-$('btnCam').onclick = startCam;
-$('btnTorch').onclick = async () => {
-  torchOn = !torchOn;
-  try { await track.applyConstraints({ advanced: [{ torch: torchOn }] }); } catch (e) {}
-  $('btnTorch').textContent = torchOn ? '플래시 끄기' : '플래시';
-};
 
-// ================= 글자 인식 (재고 미등록일 때 보조) =================
-let worker, lastFileCanvas = null;
-async function runOcr(source) {
-  $('btnOcr').disabled = true; setStatus('글자 인식 중...');
-  try {
-    if (!worker) { setStatus('OCR 엔진 로딩 중 (최초 1회)...'); worker = await Tesseract.createWorker('eng'); }
-    const { data } = await worker.recognize(source);
-    const flat = data.text.toUpperCase().replace(/[ \t]+/g, ' ');
-    const sm = flat.match(/S[MN][-–—\s]?([A-Z]\d{3}[A-Z0-9]{4,8})/);
-    const apm = flat.match(/\b([MF][A-Z0-9]{3,4}[0-9]?[A-Z]{2})\s?\/\s?A\b/);
-    if (sm) ocr.model = 'SM-' + sm[1].replace(/O(?=\d)/g, '0');
-    else if (apm) ocr.model = apm[1] + '/A';
-    $('ocrText').textContent = '[OCR 원문]\n' + data.text.trim();
-    setStatus(ocr.model ? '글자인식 모델: ' + ocr.model : '모델명 못 찾음');
-    render();
-  } catch (e) { setStatus('OCR 오류: ' + e.message); }
-  finally { $('btnOcr').disabled = false; }
-}
-$('btnOcr').onclick = () => { if (stream) { grabBox(); runOcr(canvas); } else if (lastFileCanvas) runOcr(lastFileCanvas); };
-
-// ================= 사진 파일 테스트 =================
+// ================= 사진파일 =================
 $('file').onchange = async e => {
   const f = e.target.files[0]; if (!f) return;
   setStatus('사진 분석 중...');
   if (!(await libReady)) return;
-  const bmp = await createImageBitmap(f, { imageOrientation: 'from-image' });
-  const k = Math.min(1, 2400 / Math.max(bmp.width, bmp.height));
-  const c = document.createElement('canvas');
-  c.width = Math.round(bmp.width * k); c.height = Math.round(bmp.height * k);
-  const cx = c.getContext('2d', { willReadFrequently: true });
-  cx.drawImage(bmp, 0, 0, c.width, c.height);
-  lastFileCanvas = c;
-  $('preview').src = c.toDataURL('image/jpeg', 0.7); $('preview').style.display = 'block';
-  const t0 = performance.now();
-  const res = await readBarcodes(cx.getImageData(0, 0, c.width, c.height), READ_OPTS);
-  addCodes(res); render();
-  setStatus(`사진: 바코드 ${res.length}개 · ${Math.round(performance.now() - t0)}ms`);
-  $('btnOcr').disabled = false;
+  try {
+    const bmp = await createImageBitmap(f, { imageOrientation: 'from-image' });
+    const k = Math.min(1, 2400 / Math.max(bmp.width, bmp.height));
+    const c = document.createElement('canvas'); c.width = Math.round(bmp.width * k); c.height = Math.round(bmp.height * k);
+    const cx = c.getContext('2d', { willReadFrequently: true }); cx.drawImage(bmp, 0, 0, c.width, c.height);
+    const n = addSerials(serialsFrom(await readBarcodes(cx.getImageData(0, 0, c.width, c.height), READ_OPTS)));
+    setStatus(n ? `사진에서 ${n}건 추가` : '사진에서 새 일련번호를 찾지 못했습니다');
+  } catch (err) { setStatus('사진 분석 실패: ' + err.message); }
   e.target.value = '';
 };
 
-boot();
+// ================= 입력완료 / 초기화 =================
+$('btnSend').onclick = async () => {
+  if (!picked) { toast('P코드를 먼저 선택하세요'); $('pcode').focus(); return; }
+  if (!list.length) return;
+  if (!confirm(`${picked.name} (${picked.code})\n${list.length}건을 전송할까요?`)) return;
+  $('btnSend').disabled = true; setStatus('전송 중...');
+  try {
+    await AW.createDoc(C.databaseId, C.surveyCollectionId, {
+      pcode: picked.code, store: picked.name, count: list.length,
+      items: JSON.stringify(list.map(x => ({ m: x.model, s: x.serial, r: x.serialRaw, k: x.matched ? 1 : 0 })))
+    });
+    beep(2400); toast(`${list.length}건 전송 완료`);
+    setStatus(`${picked.name} · ${list.length}건 전송 완료`);
+    list = []; saveDraft(); renderList();
+  } catch (e) {
+    alert('전송 실패: ' + e.message + '\n(목록은 그대로 남아 있으니 다시 [입력완료]를 누르세요)');
+    setStatus('전송 실패');
+  } finally { updateSend(); }
+};
+$('btnClear').onclick = () => {
+  if (list.length && !confirm(`인식 결과 ${list.length}건을 모두 지울까요?`)) return;
+  list = []; saveDraft(); renderList(); setStatus('');
+};
+
+renderList();
+loadData();
 </script>
 </body>
 </html>
