@@ -112,7 +112,7 @@
   </div>
   <div id="recentPick" class="hidden"></div>
   <div class="info" style="justify-content:center"><span id="dataInfo">판매점·재고 목록 불러오는 중...</span><a id="btnReload">새로고침</a></div>
-  <div class="ver">버전 20261013j</div>
+  <div class="ver">버전 20261013k</div>
 </div>
 
 <!-- 조사 화면 -->
@@ -144,9 +144,9 @@
 </div>
 <div class="toast" id="toast"></div>
 
-<script src="config.js?v=20261013j"></script>
-<script src="appwrite.js?v=20261013j"></script>
-<script src="stock.js?v=20261013j"></script>
+<script src="config.js?v=20261013k"></script>
+<script src="appwrite.js?v=20261013k"></script>
+<script src="stock.js?v=20261013k"></script>
 <script type="module">
 const $ = id => document.getElementById(id);
 const C = window.APP_CONFIG;
@@ -327,7 +327,7 @@ function showDup(x) {
   clearTimeout(dupTimer); dupTimer = setTimeout(() => el.classList.add('off'), 2500);
   const row = document.querySelector(`#list .it[data-s="${CSS.escape(x.serial)}"]`);
   if (row) { row.classList.remove('dup'); void row.offsetWidth; row.classList.add('dup'); }
-  navigator.vibrate?.([40, 60, 40]); beep(600);
+  haptic(true); beep(600);
 }
 function addSerials(found) {
   let added = 0; const now = Date.now();
@@ -346,7 +346,7 @@ function addSerials(found) {
   }
   if (added) {
     $('box').classList.add('hit'); setTimeout(() => $('box').classList.remove('hit'), 250);
-    navigator.vibrate?.(70); beep();
+    haptic(); beep();
     $('dupMsg').classList.add('off');
     saveDraft(); renderList();
   }
@@ -370,6 +370,23 @@ function relabel() {   // 재고리스트가 늦게 로드된 경우 모델명 �
 }
 function updateSend() { $('btnSend').disabled = !(picked && list.length); }
 
+// ---- 진동: 안드로이드는 Vibration API, 아이폰(Safari는 미지원)은 iOS 18+ 스위치 햅틱으로 대체 ----
+const iosHaptic = (() => {
+  if ('vibrate' in navigator) return null;
+  const l = document.createElement('label'), i = document.createElement('input');
+  i.type = 'checkbox'; i.setAttribute('switch', '');
+  l.appendChild(i); l.style.cssText = 'position:fixed;left:-999px;top:0;opacity:0;pointer-events:none';
+  document.body.appendChild(l); return l;
+})();
+function haptic(double = false) {
+  if ('vibrate' in navigator) { navigator.vibrate(double ? [40, 60, 40] : 70); return; }
+  try { iosHaptic.click(); if (double) setTimeout(() => iosHaptic.click(), 140); } catch (e) {}
+}
+// 아이폰은 사용자가 화면을 한 번 눌러야 소리가 나므로 첫 터치 때 오디오를 깨워둠
+function unlockAudio() {
+  try { actx = actx || new (window.AudioContext || window.webkitAudioContext)(); if (actx.state === 'suspended') actx.resume(); } catch (e) {}
+}
+addEventListener('touchend', unlockAudio, { passive: true }); addEventListener('click', unlockAudio);
 let actx;
 function beep(f = 1800) {
   try { actx = actx || new (window.AudioContext || window.webkitAudioContext)();
