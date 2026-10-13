@@ -40,7 +40,9 @@
     const out = [];
     for (const r of table.slice(hi + 1)) {
       const model = String(r[iM] ?? '').trim();
-      const serial = norm(r[iS]);
+      let serial = norm(r[iS]);
+      // 숫자만 있는 일련번호는 엑셀에서 앞자리 0이 빠짐 (0123456 → 123456) → 7자리로 복원
+      if (/^\d+$/.test(serial) && serial.length < 7) serial = serial.padStart(7, '0');
       if (!model || !serial) continue;
       const price = iP >= 0 ? Number(String(r[iP] ?? '').replace(/[^\d.-]/g, '')) || 0 : 0;
       out.push({ model, serial, price });
