@@ -16,6 +16,7 @@
       method,
       headers: headers(!form),
       credentials: 'include',
+      cache: 'no-store',   // Appwrite 파일 응답은 45일 캐시 헤더가 붙어 옴 → 항상 서버 최신본을 받도록
       body: body == null ? undefined : (form ? body : JSON.stringify(body))
     });
     const fb = res.headers.get('X-Fallback-Cookies');
