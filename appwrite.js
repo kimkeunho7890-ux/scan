@@ -86,6 +86,7 @@
     },
 
     // DB
+    deleteDoc: (db, col, id) => call('DELETE', `/databases/${db}/collections/${col}/documents/${id}`),
     createDoc: (db, col, data) =>
       call('POST', `/databases/${db}/collections/${col}/documents`, { documentId: 'unique()', data }),
     listDocs: (db, col, queries = []) =>
