@@ -67,7 +67,17 @@
       const res = await call('GET', `/storage/buckets/${bucket}/files/${id}/download`, null, { raw: true });
       return new TextDecoder('utf-8').decode(await res.arrayBuffer()).replace(/^﻿/, '');
     },
+    fileBlob: async (bucket, id) => {
+      const res = await call('GET', `/storage/buckets/${bucket}/files/${id}/view`, null, { raw: true });
+      return res.blob();
+    },
     deleteFile: (bucket, id) => call('DELETE', `/storage/buckets/${bucket}/files/${id}`),
+    // 같은 ID 파일을 지우고 다시 올림 (덮어쓰기)
+    replaceFile: async (bucket, id, blob, name) => {
+      try { await call('DELETE', `/storage/buckets/${bucket}/files/${id}`); } catch (e) { if (e.code !== 404) throw e; }
+      const fd = new FormData(); fd.append('fileId', id); fd.append('file', blob, name);
+      return call('POST', `/storage/buckets/${bucket}/files`, fd, { form: true });
+    },
     uploadFile: (bucket, id, blob, name) => {
       const fd = new FormData();
       fd.append('fileId', id);
@@ -80,6 +90,19 @@
       call('POST', `/databases/${db}/collections/${col}/documents`, { documentId: 'unique()', data }),
     listDocs: (db, col, queries = []) =>
       call('GET', `/databases/${db}/collections/${col}/documents?` + qs(queries)),
+    // 컬렉션 전체 문서 (커서 페이지네이션)
+    listAll: async (db, col, pageSize = 500, onPage) => {
+      const all = []; let cursor = null;
+      while (true) {
+        const qq = [q('orderDesc', '$createdAt'), q('limit', null, [pageSize])];
+        if (cursor) qq.push(q('cursorAfter', null, [cursor]));
+        const r = await call('GET', `/databases/${db}/collections/${col}/documents?` + qs(qq));
+        all.push(...r.documents); onPage && onPage(all.length, r.total);
+        if (r.documents.length < pageSize) break;
+        cursor = r.documents[r.documents.length - 1].$id;
+      }
+      return all;
+    },
     Q: {
       equal: (a, v) => q('equal', a, Array.isArray(v) ? v : [v]),
       orderDesc: a => q('orderDesc', a),
