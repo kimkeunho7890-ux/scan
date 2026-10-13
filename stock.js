@@ -7,7 +7,10 @@
     const s = norm(serial); if (!s) return [];
     const stripped = s.replace(/[A-Z]+$/, '');
     const m7 = stripped.match(/(\d{7})$/);
-    return [...new Set([s, stripped, m7 && m7[1]].filter(Boolean))];
+    const keys = [s, stripped, m7 && m7[1]].filter(Boolean);
+    // 숫자만 있는 키는 앞자리 0을 뗀 형태도 등록 → 엑셀에서 0이 빠진 재고리스트(123456)와 스캔값(0123456)이 서로 매칭
+    for (const k of [...keys]) if (/^\d+$/.test(k)) { const z = k.replace(/^0+/, ''); if (z) keys.push(z); }
+    return [...new Set(keys)];
   }
 
   // 간단 CSV 파서 (따옴표/쉼표 포함 값 지원)
@@ -40,9 +43,7 @@
     const out = [];
     for (const r of table.slice(hi + 1)) {
       const model = String(r[iM] ?? '').trim();
-      let serial = norm(r[iS]);
-      // 숫자만 있는 일련번호는 엑셀에서 앞자리 0이 빠짐 (0123456 → 123456) → 7자리로 복원
-      if (/^\d+$/.test(serial) && serial.length < 7) serial = serial.padStart(7, '0');
+      const serial = norm(r[iS]);   // 앞자리 0 빠짐(0123456→123456)은 매칭 키에서 처리 (keysOf)
       if (!model || !serial) continue;
       const price = iP >= 0 ? Number(String(r[iP] ?? '').replace(/[^\d.-]/g, '')) || 0 : 0;
       out.push({ model, serial, price });
