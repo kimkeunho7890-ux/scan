@@ -1,5 +1,5 @@
 // 출고SCAN 서비스워커: 우리 사이트 파일만 네트워크 우선 + 오프라인 시 캐시 사용 (Appwrite/CDN 요청은 건드리지 않음)
-const CACHE = 'scan-v8';
+const CACHE = 'scan-v9';
 self.addEventListener('install', () => self.skipWaiting());
 self.addEventListener('activate', e => e.waitUntil(
   caches.keys().then(ks => Promise.all(ks.filter(k => k !== CACHE).map(k => caches.delete(k))))
