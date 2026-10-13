@@ -58,6 +58,10 @@
   .ver{text-align:center;font-size:11px;color:#555;margin-top:18px}
   #list .x{background:none;border:0;color:var(--bad);font-size:20px;padding:0;line-height:1}
   #list .it.new{animation:flash 1s}
+  #list .it.dup{animation:dupflash 1.2s}
+  @keyframes dupflash{from{background:rgba(239,68,68,.35)}to{background:transparent}}
+  #dupMsg{color:var(--bad);font-weight:700;font-size:15px;min-height:22px;margin-top:10px;transition:opacity .3s}
+  #dupMsg.off{opacity:0}
   @keyframes flash{from{background:rgba(16,185,129,.35)}to{background:transparent}}
   .empty{color:#555;padding:10px 0}
   .hidden{display:none!important}
@@ -108,7 +112,7 @@
   </div>
   <div id="recentPick" class="hidden"></div>
   <div class="info" style="justify-content:center"><span id="dataInfo">판매점·재고 목록 불러오는 중...</span><a id="btnReload">새로고침</a></div>
-  <div class="ver">버전 20261013g</div>
+  <div class="ver">버전 20261013h</div>
 </div>
 
 <!-- 조사 화면 -->
@@ -131,7 +135,8 @@
   </div>
   <div id="status"></div>
 
-  <div class="card">
+  <div id="dupMsg" class="off"></div>
+  <div class="card" style="margin-top:4px">
     <h2><span>인식 결과</span><span id="listCnt">0건</span></h2>
     <div id="list"><div class="empty">바코드를 비추면 모델명·일련번호가 한 줄씩 쌓입니다</div></div>
   </div>
@@ -139,9 +144,9 @@
 </div>
 <div class="toast" id="toast"></div>
 
-<script src="config.js?v=20261013g"></script>
-<script src="appwrite.js?v=20261013g"></script>
-<script src="stock.js?v=20261013g"></script>
+<script src="config.js?v=20261013h"></script>
+<script src="appwrite.js?v=20261013h"></script>
+<script src="stock.js?v=20261013h"></script>
 <script type="module">
 const $ = id => document.getElementById(id);
 const C = window.APP_CONFIG;
@@ -309,17 +314,37 @@ function serialsFrom(results) {
   }
   return out;
 }
+// 같은 박스가 계속 비칠 때 연속 경고가 뜨지 않도록: 방금 추가한 일련번호는 2.5초간 경고 제외, 경고는 같은 번호당 2초에 1번
+const recentAdd = new Map(), recentWarn = new Map();
+let dupTimer = null;
+function showDup(x) {
+  const el = $('dupMsg');
+  el.textContent = `이미 입력된 재고입니다 · ${x.matched ? x.model : '재고 미등록'} ${x.serial}`;
+  el.classList.remove('off');
+  clearTimeout(dupTimer); dupTimer = setTimeout(() => el.classList.add('off'), 2500);
+  const row = document.querySelector(`#list .it[data-s="${CSS.escape(x.serial)}"]`);
+  if (row) { row.classList.remove('dup'); void row.offsetWidth; row.classList.add('dup'); }
+  navigator.vibrate?.([40, 60, 40]); beep(600);
+}
 function addSerials(found) {
-  let added = 0;
+  let added = 0; const now = Date.now();
   for (const f of found) {
-    if (list.some(x => x.serial === f.serial)) continue;
+    const ex = list.find(x => x.serial === f.serial);
+    if (ex) {
+      if (now - (recentAdd.get(f.serial) || 0) < 2500) continue;     // 방금 찍은 박스
+      if (now - (recentWarn.get(f.serial) || 0) < 2000) continue;    // 경고 반복 방지
+      recentWarn.set(f.serial, now); showDup(ex);
+      continue;
+    }
     const { model, matched } = lookupModel(f.cands);
     list.push({ model, serial: f.serial, serialRaw: f.raw, matched, _new: true });
+    recentAdd.set(f.serial, now);
     added++;
   }
   if (added) {
     $('box').classList.add('hit'); setTimeout(() => $('box').classList.remove('hit'), 250);
     navigator.vibrate?.(70); beep();
+    $('dupMsg').classList.add('off');
     saveDraft(); renderList();
   }
   return added;
@@ -327,7 +352,7 @@ function addSerials(found) {
 function renderList() {
   const el = $('list');
   if (!list.length) el.innerHTML = '<div class="empty">바코드를 비추면 모델명·일련번호가 한 줄씩 쌓입니다</div>';
-  else el.innerHTML = list.map((x, i) => `<div class="it${x._new ? ' new' : ''}"><span class="n">${i + 1}</span>
+  else el.innerHTML = list.map((x, i) => `<div class="it${x._new ? ' new' : ''}" data-s="${esc(x.serial)}"><span class="n">${i + 1}</span>
       <span class="m${x.matched ? '' : ' no'}">${x.matched ? esc(x.model) : '재고 미등록'}</span>
       <span class="s">${esc(x.serial)}${x.serialRaw && x.serialRaw !== x.serial ? `<small>${esc(x.serialRaw)}</small>` : ''}</span><button class="x" data-i="${i}" aria-label="삭제">×</button></div>`).reverse().join('');
   list.forEach(x => delete x._new);
@@ -450,7 +475,7 @@ $('file').onchange = async e => {
     const c = document.createElement('canvas'); c.width = Math.round(bmp.width * k); c.height = Math.round(bmp.height * k);
     const cx = c.getContext('2d', { willReadFrequently: true }); cx.drawImage(bmp, 0, 0, c.width, c.height);
     const n = addSerials(serialsFrom(await readBarcodes(cx.getImageData(0, 0, c.width, c.height), READ_OPTS)));
-    setStatus(n ? `사진에서 ${n}건 추가` : '사진에서 새 일련번호를 찾지 못했습니다');
+    setStatus(n ? `사진에서 ${n}건 추가` : ($('dupMsg').classList.contains('off') ? '사진에서 새 일련번호를 찾지 못했습니다' : ''));
   } catch (err) { setStatus('사진 분석 실패: ' + err.message); }
   e.target.value = '';
 };
