@@ -107,9 +107,9 @@
   </div>
 </main>
 
-<script src="config.js?v=20261013k"></script>
-<script src="appwrite.js?v=20261013k"></script>
-<script src="stock.js?v=20261013k"></script>
+<script src="config.js?v=20261013l"></script>
+<script src="appwrite.js?v=20261013l"></script>
+<script src="stock.js?v=20261013l"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script>
 const $ = id => document.getElementById(id);
@@ -193,7 +193,7 @@ $('btnUpStock').onclick = async () => {
     await AW.replaceFile(C.publicBucketId, C.pubStockFileId, new Blob([pub], { type: 'text/csv' }), 'stocklist_pub.csv');
     $('stockMsg').innerHTML = `<span class="ok">등록 완료: ${stockParsed.length.toLocaleString()}건</span>`;
     $('stockPreview').classList.add('hidden'); stockParsed = null;
-    showStockInfo();
+    showStockInfo(); loadSurveys();
   } catch (e) {
     $('stockMsg').innerHTML = `<span class="bad">업로드 실패: ${esc(e.message)}</span>` + (e.code === 401 ? '<br>버킷 쓰기 권한을 확인하세요.' : e.code === 404 ? '<br>버킷이 없습니다 (stocklist / public 버킷 생성 확인).' : '');
   } finally { $('btnUpStock').disabled = false; }
@@ -266,12 +266,20 @@ async function loadSurveys() {
         entries.push({ pcode: d.pcode, store: d.pcode === '영업사원' ? `${d.store} (영업사원)` : d.store, model: x.m || '', serial: x.s || '', serialRaw: x.r || x.s || '', matched: !!x.k, at: d.$createdAt });
       }
     }
+    // 현재 등록된 재고리스트로 모델명 다시 매칭 (재고리스트를 나중에 올리거나 바꿔도 반영)
+    let curIdx = null;
+    try { curIdx = Stock.buildIndex(await getStockRows(true)); } catch (e) {}
+    if (curIdx) for (const e of entries) {
+      const m = curIdx.find([e.serialRaw, e.serial]);
+      if (m.rows.length) { e.model = [...new Set(m.rows.map(r => r.model))].join(' / '); e.gone = false; e.matched = true; }
+      else { e.gone = e.matched; e.matched = false; }   // 조사 땐 있었는데 새 재고리스트엔 없음
+    }
     const stores = new Set(entries.map(e => e.store));
     $('svInfo').textContent = `${docs.length}회 전송`;
     $('svStats').innerHTML = `<div><b>${entries.length.toLocaleString()}</b>입력 단말</div><div><b>${stores.size}</b>판매점</div><div><b class="${entries.some(e => !e.matched) ? 'warn' : ''}">${entries.filter(e => !e.matched).length}</b>재고 미등록</div><div><b>${dupCnt}</b>중복 입력 (이전 입력 제외됨)</div>`;
     const MAX = 500;
     $('svBody').innerHTML = entries.length
-      ? entries.slice(0, MAX).map((e, i) => `<tr><td class="n">${i + 1}</td><td>${esc(e.store)}</td><td${e.matched ? '' : ' class="warn"'}>${e.matched ? esc(e.model) : '재고 미등록'}</td><td class="mono">${esc(e.serial)}</td></tr>`).join('')
+      ? entries.slice(0, MAX).map((e, i) => `<tr><td class="n">${i + 1}</td><td>${esc(e.store)}</td><td${e.matched ? '' : ' class="warn"'}>${esc(modelLabel(e))}</td><td class="mono">${esc(e.serial)}</td></tr>`).join('')
         + (entries.length > MAX ? `<tr><td colspan="4" style="color:var(--sub)">… 최근 ${MAX}건만 표시 (전체는 [입력건 다운로드])</td></tr>` : '')
       : '<tr><td colspan="4" style="color:var(--sub)">입력된 내역이 없습니다</td></tr>';
   } catch (e) {
@@ -280,6 +288,7 @@ async function loadSurveys() {
   }
 }
 $('btnSvReload').onclick = loadSurveys;
+const modelLabel = e => e.matched ? e.model : (e.gone && e.model ? `${e.model} (재고리스트에 없음)` : '재고 미등록');
 
 function saveXlsx(rows, header, name) {
   const ws = XLSX.utils.aoa_to_sheet([header, ...rows]);
@@ -296,7 +305,7 @@ function saveXlsx(rows, header, name) {
 // 입력건 다운로드: 입력된 리스트만
 $('btnDlInput').onclick = () => {
   if (!entries.length) return alert('입력된 내역이 없습니다');
-  saveXlsx(entries.map(e => [e.store, e.matched ? e.model : '재고 미등록', e.serial]),
+  saveXlsx(entries.map(e => [e.store, modelLabel(e), e.serial]),
            ['판매점명', '모델명', '일련번호'], `재고조사_입력건_${today()}.xlsx`);
 };
 
