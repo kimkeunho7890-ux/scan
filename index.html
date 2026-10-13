@@ -112,7 +112,7 @@
   </div>
   <div id="recentPick" class="hidden"></div>
   <div class="info" style="justify-content:center"><span id="dataInfo">판매점·재고 목록 불러오는 중...</span><a id="btnReload">새로고침</a></div>
-  <div class="ver">버전 20261013m</div>
+  <div class="ver">버전 20261013n</div>
 </div>
 
 <!-- 조사 화면 -->
@@ -144,9 +144,9 @@
 </div>
 <div class="toast" id="toast"></div>
 
-<script src="config.js?v=20261013m"></script>
-<script src="appwrite.js?v=20261013m"></script>
-<script src="stock.js?v=20261013m"></script>
+<script src="config.js?v=20261013n"></script>
+<script src="appwrite.js?v=20261013n"></script>
+<script src="stock.js?v=20261013n"></script>
 <script type="module">
 const $ = id => document.getElementById(id);
 const C = window.APP_CONFIG;
@@ -281,8 +281,10 @@ $('btnChange').onclick = () => {
 let list = [];   // [{model, serial, serialRaw, matched}]
 try { list = JSON.parse(localStorage.getItem('survey_list') || '[]'); } catch (e) {}
 const saveDraft = () => { try { localStorage.setItem('survey_list', JSON.stringify(list)); } catch (e) {} };
-// 삼성 박스 바코드 = 라벨 인쇄 일련번호(12자리) + 검증문자 1자리 (예: CTLSM0107718+7, CT7BM1097614+N)
-const samsungBase = t => t.length === 13 ? t.slice(0, -1) : t.replace(/[A-Z]+$/, '');
+// 삼성 박스 바코드 = 라벨 인쇄 일련번호 + 검증문자 1자리
+//   인쇄 12자리 → 바코드 13자리 (CTLSM0107718+7, CT7BM1097614+N, CT61M0399510+B)
+//   인쇄 15자리 → 바코드 16자리 (SML345AE1168564+9)
+const samsungBase = t => (t.length === 13 || t.length === 16) ? t.slice(0, -1) : t.replace(/[A-Z]+$/, '');
 // 표시용: 인쇄 일련번호의 끝 숫자 7자리 (CTLSM01077187 → 0107718)
 const serial7 = s => { const m = samsungBase(String(s)).match(/(\d{7})$/); return m ? m[1] : null; };
 
