@@ -53,7 +53,9 @@
   #list .n{color:var(--sub);font-size:12px}
   #list .m{font-weight:700;word-break:break-all}
   #list .m.no{color:var(--warn);font-weight:600}
-  #list .s{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:14px}
+  #list .s{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:14px;text-align:right}
+  #list .s small{display:block;font-size:10px;color:var(--sub)}
+  .ver{text-align:center;font-size:11px;color:#555;margin-top:18px}
   #list .x{background:none;border:0;color:var(--bad);font-size:20px;padding:0;line-height:1}
   #list .it.new{animation:flash 1s}
   @keyframes flash{from{background:rgba(16,185,129,.35)}to{background:transparent}}
@@ -106,6 +108,7 @@
   </div>
   <div id="recentPick" class="hidden"></div>
   <div class="info" style="justify-content:center"><span id="dataInfo">판매점·재고 목록 불러오는 중...</span><a id="btnReload">새로고침</a></div>
+  <div class="ver">버전 20261013f</div>
 </div>
 
 <!-- 조사 화면 -->
@@ -136,9 +139,9 @@
 </div>
 <div class="toast" id="toast"></div>
 
-<script src="config.js?v=20261013e"></script>
-<script src="appwrite.js?v=20261013e"></script>
-<script src="stock.js?v=20261013e"></script>
+<script src="config.js?v=20261013f"></script>
+<script src="appwrite.js?v=20261013f"></script>
+<script src="stock.js?v=20261013f"></script>
 <script type="module">
 const $ = id => document.getElementById(id);
 const C = window.APP_CONFIG;
@@ -322,7 +325,7 @@ function renderList() {
   if (!list.length) el.innerHTML = '<div class="empty">바코드를 비추면 모델명·일련번호가 한 줄씩 쌓입니다</div>';
   else el.innerHTML = list.map((x, i) => `<div class="it${x._new ? ' new' : ''}"><span class="n">${i + 1}</span>
       <span class="m${x.matched ? '' : ' no'}">${x.matched ? esc(x.model) : '재고 미등록'}</span>
-      <span class="s">${esc(x.serial)}</span><button class="x" data-i="${i}" aria-label="삭제">×</button></div>`).reverse().join('');
+      <span class="s">${esc(x.serial)}${x.serialRaw && x.serialRaw !== x.serial ? `<small>${esc(x.serialRaw)}</small>` : ''}</span><button class="x" data-i="${i}" aria-label="삭제">×</button></div>`).reverse().join('');
   list.forEach(x => delete x._new);
   el.querySelectorAll('.x').forEach(b => b.onclick = () => { list.splice(+b.dataset.i, 1); saveDraft(); renderList(); });
   $('listCnt').textContent = list.length + '건';
