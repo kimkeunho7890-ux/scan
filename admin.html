@@ -95,9 +95,9 @@
   </div>
 </main>
 
-<script src="config.js?v=20261013b"></script>
-<script src="appwrite.js?v=20261013b"></script>
-<script src="stock.js?v=20261013b"></script>
+<script src="config.js?v=20261013c"></script>
+<script src="appwrite.js?v=20261013c"></script>
+<script src="stock.js?v=20261013c"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script>
 const $ = id => document.getElementById(id);
@@ -243,7 +243,7 @@ async function loadSurveys() {
     entries = [];
     for (const d of docs) {
       let its = []; try { its = JSON.parse(d.items || '[]'); } catch (e) {}
-      for (const x of its) entries.push({ pcode: d.pcode, store: d.store, model: x.m || '', serial: x.s || '', serialRaw: x.r || x.s || '', matched: !!x.k, at: d.$createdAt });
+      for (const x of its) entries.push({ pcode: d.pcode, store: d.pcode === '영업사원' ? `${d.store} (영업사원)` : d.store, model: x.m || '', serial: x.s || '', serialRaw: x.r || x.s || '', matched: !!x.k, at: d.$createdAt });
     }
     const stores = new Set(entries.map(e => e.store));
     $('svInfo').textContent = `${docs.length}회 전송`;
