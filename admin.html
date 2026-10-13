@@ -3,62 +3,94 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>재고리스트 등록</title>
+<title>재고조사 관리자</title>
 <style>
-  :root{--bg:#0f1115;--card:#1a1d24;--line:#2a2f3a;--txt:#e8eaf0;--sub:#9aa3b2;--acc:#3b82f6;--ok:#22c55e;--warn:#f59e0b;--bad:#ef4444}
+  :root{--bg:#0f1115;--card:#1a1d24;--line:#2a2f3a;--txt:#e8eaf0;--sub:#9aa3b2;--acc:#3b82f6;--grn:#10b981;--ok:#22c55e;--warn:#f59e0b;--bad:#ef4444}
   *{box-sizing:border-box}
   body{margin:0;background:var(--bg);color:var(--txt);font-family:-apple-system,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;font-size:15px}
   header{padding:12px 16px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center}
   header h1{font-size:17px;margin:0}
   header a{color:var(--acc);cursor:pointer;font-size:13px;margin-left:10px}
-  main{max-width:760px;margin:0 auto;padding:16px}
+  main{max-width:900px;margin:0 auto;padding:16px}
   .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:12px}
-  .card h2{font-size:14px;color:var(--sub);margin:0 0 10px;font-weight:600}
+  .card h2{font-size:15px;margin:0 0 10px;font-weight:700;display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+  .card h2 small{font-weight:400;color:var(--sub);font-size:12px}
   input[type=email],input[type=password]{width:100%;background:#0f1115;color:var(--txt);border:1px solid var(--line);border-radius:8px;padding:10px;font-size:15px;margin-bottom:8px}
-  button{background:var(--acc);color:#fff;border:0;border-radius:10px;padding:12px 16px;font-size:15px;font-weight:600;cursor:pointer;font-family:inherit}
+  button{background:var(--acc);color:#fff;border:0;border-radius:10px;padding:11px 14px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit}
+  button.sec{background:#374151}
+  button.grn{background:var(--grn);color:#04261b}
   button:disabled{opacity:.4}
-  .drop{border:2px dashed var(--line);border-radius:12px;padding:28px;text-align:center;color:var(--sub);cursor:pointer}
+  .drop{display:block;border:2px dashed var(--line);border-radius:12px;padding:22px;text-align:center;color:var(--sub);cursor:pointer}
   .drop.over{border-color:var(--acc);color:var(--txt)}
-  .stats{display:flex;gap:16px;flex-wrap:wrap;margin:10px 0;font-size:14px}
-  .stats b{font-size:18px;display:block}
+  .stats{display:flex;gap:16px;flex-wrap:wrap;margin:10px 0;font-size:13px;color:var(--sub)}
+  .stats b{font-size:18px;display:block;color:var(--txt)}
   table{width:100%;border-collapse:collapse;font-size:13px}
-  th,td{text-align:left;padding:6px 4px;border-bottom:1px solid var(--line)}
-  th{color:var(--sub);font-weight:600}
+  th,td{text-align:left;padding:7px 6px;border-bottom:1px solid var(--line)}
+  th{color:var(--sub);font-weight:600;position:sticky;top:0;background:var(--card)}
+  td.mono{font-family:ui-monospace,Menlo,Consolas,monospace}
   td.n{text-align:right;font-variant-numeric:tabular-nums}
+  .scroll{max-height:60vh;overflow:auto;border:1px solid var(--line);border-radius:8px}
   .msg{font-size:13px;margin-top:8px}
   .ok{color:var(--ok)} .bad{color:var(--bad)} .warn{color:var(--warn)}
+  .btnrow{display:flex;gap:8px;flex-wrap:wrap}
+  .cur{font-size:13px;color:var(--sub);margin-bottom:10px}
+  .cur b{color:var(--txt)}
   .hidden{display:none!important}
 </style>
 </head>
 <body>
-<header><h1>재고리스트 등록</h1><div><span id="me" style="font-size:12px;color:var(--sub)"></span><a href="./">스캔 화면</a><a id="btnLogout" class="hidden">로그아웃</a></div></header>
+<header><h1>재고조사 관리자</h1><div><span id="me" style="font-size:12px;color:var(--sub)"></span><a href="./">조사 화면</a><a id="btnLogout" class="hidden">로그아웃</a></div></header>
 <main>
-  <div class="card" id="loginCard">
+  <div class="card" id="loginCard" style="max-width:380px;margin:40px auto">
     <h2>관리자 로그인</h2>
     <input type="email" id="email" placeholder="이메일" autocomplete="username">
     <input type="password" id="pw" placeholder="비밀번호" autocomplete="current-password">
-    <button id="btnLogin">로그인</button>
+    <button id="btnLogin" style="width:100%">로그인</button>
     <div class="msg bad" id="loginMsg"></div>
   </div>
 
   <div id="adminBody" class="hidden">
+
+    <!-- 입력완료 내역 -->
     <div class="card">
-      <h2>현재 등록된 재고리스트</h2>
-      <div id="curInfo">확인 중...</div>
+      <h2><span>입력완료 내역 <small id="svInfo"></small></span>
+        <span class="btnrow">
+          <button class="sec" id="btnSvReload">새로고침</button>
+          <button class="grn" id="btnDlInput">입력건 다운로드</button>
+          <button class="grn" id="btnDlAll">전체 다운로드</button>
+        </span></h2>
+      <div class="stats" id="svStats"></div>
+      <div class="scroll"><table>
+        <thead><tr><th style="width:44px">No</th><th>판매점명</th><th>모델명</th><th>일련번호</th></tr></thead>
+        <tbody id="svBody"><tr><td colspan="4" style="color:var(--sub)">불러오는 중...</td></tr></tbody>
+      </table></div>
+      <div class="msg" id="svMsg"></div>
     </div>
 
+    <!-- 재고리스트 -->
     <div class="card">
-      <h2>새 재고리스트 업로드 (CSV / XLSX · 컬럼: 모델명, 일련번호, 출고가)</h2>
-      <label class="drop" id="drop">파일을 끌어다 놓거나 눌러서 선택
-        <input type="file" id="file" accept=".csv,.xlsx,.xls" hidden>
-      </label>
-      <div id="preview" class="hidden">
-        <div class="stats" id="stats"></div>
-        <table id="tbl"></table>
-        <div class="msg" id="warnMsg"></div>
-        <button id="btnUpload" style="margin-top:12px;width:100%">서버에 등록 (기존 리스트 교체)</button>
+      <h2>재고리스트 업로드 <small>CSV / XLSX · 모델명, 일련번호, 출고가</small></h2>
+      <div class="cur" id="curStock">확인 중...</div>
+      <label class="drop" id="dropStock">파일을 끌어다 놓거나 눌러서 선택<input type="file" id="fileStock" accept=".csv,.xlsx,.xls" hidden></label>
+      <div id="stockPreview" class="hidden">
+        <div class="stats" id="stockStats"></div>
+        <table id="stockTbl"></table>
+        <button id="btnUpStock" style="margin-top:12px;width:100%">서버에 등록 (기존 리스트 교체)</button>
       </div>
-      <div class="msg" id="upMsg"></div>
+      <div class="msg" id="stockMsg"></div>
+    </div>
+
+    <!-- 판매점 목록 -->
+    <div class="card">
+      <h2>판매점 목록 등록 <small>kim-gwajang.com [다운로드] 엑셀(판매점현황_*.xlsx) 그대로 업로드</small></h2>
+      <div class="cur" id="curStores">확인 중...</div>
+      <label class="drop" id="dropStores">파일을 끌어다 놓거나 눌러서 선택<input type="file" id="fileStores" accept=".csv,.xlsx,.xls" hidden></label>
+      <div id="storesPreview" class="hidden">
+        <div class="stats" id="storesStats"></div>
+        <table id="storesTbl"></table>
+        <button id="btnUpStores" style="margin-top:12px;width:100%">서버에 등록 (P코드·판매점명만 저장)</button>
+      </div>
+      <div class="msg" id="storesMsg"></div>
     </div>
   </div>
 </main>
@@ -70,15 +102,18 @@
 <script>
 const $ = id => document.getElementById(id);
 const C = window.APP_CONFIG;
-let parsed = null;
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const today = () => { const d = new Date(); return `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`; };
+const csvEsc = v => /[",\n]/.test(String(v)) ? '"' + String(v).replace(/"/g, '""') + '"' : v;
 
+// ================= 로그인 =================
 async function boot() {
   let user = null;
   try { user = await AW.me(); } catch (e) {}
   $('loginCard').classList.toggle('hidden', !!user);
   $('adminBody').classList.toggle('hidden', !user);
   $('btnLogout').classList.toggle('hidden', !user);
-  if (user) { $('me').textContent = user.email; showCurrent(); }
+  if (user) { $('me').textContent = user.email; showStockInfo(); showStoresInfo(); loadSurveys(); }
 }
 $('btnLogin').onclick = async () => {
   try { await AW.login($('email').value.trim(), $('pw').value); boot(); }
@@ -87,18 +122,7 @@ $('btnLogin').onclick = async () => {
 $('pw').addEventListener('keydown', e => { if (e.key === 'Enter') $('btnLogin').click(); });
 $('btnLogout').onclick = async () => { await AW.logout(); location.reload(); };
 
-async function showCurrent() {
-  try {
-    const m = await AW.fileMeta(C.bucketId, C.stockFileId);
-    const text = await AW.fileText(C.bucketId, C.stockFileId);
-    const rows = Stock.toStockRows(Stock.parseCSV(text));
-    $('curInfo').innerHTML = `<b>${rows.length.toLocaleString()}건</b> · 모델 ${new Set(rows.map(r => r.model)).size}종 · 등록 ${new Date(m.$updatedAt).toLocaleString('ko-KR')}`;
-  } catch (e) {
-    $('curInfo').innerHTML = e.code === 404 ? '<span class="warn">등록된 리스트 없음</span>' : `<span class="bad">오류: ${e.message}</span>`;
-  }
-}
-
-// ---------- 파일 읽기 (CSV는 UTF-8 / EUC-KR 자동판별, XLSX는 첫 시트) ----------
+// ================= 공통: 파일 읽기 =================
 async function readTable(file) {
   const buf = await file.arrayBuffer();
   if (/\.xlsx?$/i.test(file.name)) {
@@ -106,58 +130,180 @@ async function readTable(file) {
     return XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, raw: false, defval: '' });
   }
   let text;
-  try { text = new TextDecoder('utf-8', { fatal: true }).decode(buf); }
-  catch (e) { text = new TextDecoder('euc-kr').decode(buf); }
+  try { text = new TextDecoder('utf-8', { fatal: true }).decode(buf); } catch (e) { text = new TextDecoder('euc-kr').decode(buf); }
   return Stock.parseCSV(text.replace(/^﻿/, ''));
 }
+function bindDrop(dropId, inputId, handler) {
+  const d = $(dropId);
+  $(inputId).onchange = e => e.target.files[0] && handler(e.target.files[0]);
+  d.ondragover = e => { e.preventDefault(); d.classList.add('over'); };
+  d.ondragleave = () => d.classList.remove('over');
+  d.ondrop = e => { e.preventDefault(); d.classList.remove('over'); e.dataTransfer.files[0] && handler(e.dataTransfer.files[0]); };
+}
+const fmt = s => new Date(s).toLocaleString('ko-KR');
 
-async function handleFile(file) {
-  $('upMsg').textContent = ''; $('preview').classList.add('hidden');
+// ================= 재고리스트 =================
+let stockParsed = null, stockRows = null;
+async function getStockRows(force = false) {
+  if (stockRows && !force) return stockRows;
+  stockRows = Stock.toStockRows(Stock.parseCSV(await AW.fileText(C.bucketId, C.stockFileId)));
+  return stockRows;
+}
+async function showStockInfo() {
+  try {
+    const m = await AW.fileMeta(C.bucketId, C.stockFileId);
+    const rows = await getStockRows(true);
+    $('curStock').innerHTML = `현재 등록: <b>${rows.length.toLocaleString()}건</b> · 모델 ${new Set(rows.map(r => r.model)).size}종 · ${fmt(m.$updatedAt)}`;
+  } catch (e) { $('curStock').innerHTML = e.code === 404 ? '<span class="warn">등록된 재고리스트 없음</span>' : `<span class="bad">오류: ${esc(e.message)}</span>`; }
+}
+bindDrop('dropStock', 'fileStock', async file => {
+  $('stockMsg').textContent = ''; $('stockPreview').classList.add('hidden');
   try {
     const rows = Stock.toStockRows(await readTable(file));
     if (!rows.length) throw new Error('데이터 행이 없습니다');
-    parsed = { rows, name: file.name };
-    const serialCnt = new Map();
-    rows.forEach(r => serialCnt.set(r.serial, (serialCnt.get(r.serial) || 0) + 1));
-    const dups = [...serialCnt].filter(([, n]) => n > 1).length;
-    const noPrice = rows.filter(r => !r.price).length;
-    $('stats').innerHTML = `
-      <div><b>${rows.length.toLocaleString()}</b>재고 건수</div>
-      <div><b>${new Set(rows.map(r => r.model)).size}</b>모델 종류</div>
-      <div><b class="${dups ? 'warn' : ''}">${dups}</b>중복 일련번호</div>
-      <div><b class="${noPrice ? 'warn' : ''}">${noPrice}</b>출고가 없음</div>`;
-    $('tbl').innerHTML = '<tr><th>모델명</th><th>일련번호</th><th style="text-align:right">출고가</th></tr>' +
-      rows.slice(0, 8).map(r => `<tr><td>${r.model}</td><td>${r.serial}</td><td class="n">${r.price ? r.price.toLocaleString() : '-'}</td></tr>`).join('') +
-      (rows.length > 8 ? `<tr><td colspan="3" style="color:var(--sub)">… 외 ${rows.length - 8}건</td></tr>` : '');
-    $('warnMsg').innerHTML = dups ? '<span class="warn">중복 일련번호는 스캔 시 후보로 모두 표시됩니다.</span>' : '';
-    $('preview').classList.remove('hidden');
+    stockParsed = rows;
+    const cnt = new Map(); rows.forEach(r => cnt.set(r.serial, (cnt.get(r.serial) || 0) + 1));
+    const dups = [...cnt.values()].filter(n => n > 1).length;
+    $('stockStats').innerHTML = `<div><b>${rows.length.toLocaleString()}</b>재고 건수</div><div><b>${new Set(rows.map(r => r.model)).size}</b>모델 종류</div><div><b class="${dups ? 'warn' : ''}">${dups}</b>중복 일련번호</div><div><b>${rows.filter(r => !r.price).length}</b>출고가 없음</div>`;
+    $('stockTbl').innerHTML = '<tr><th>모델명</th><th>일련번호</th><th style="text-align:right">출고가</th></tr>' +
+      rows.slice(0, 5).map(r => `<tr><td>${esc(r.model)}</td><td class="mono">${esc(r.serial)}</td><td class="n">${r.price ? r.price.toLocaleString() : '-'}</td></tr>`).join('');
+    $('stockPreview').classList.remove('hidden');
+  } catch (e) { stockParsed = null; $('stockMsg').innerHTML = `<span class="bad">파일 오류: ${esc(e.message)}</span>`; }
+});
+$('btnUpStock').onclick = async () => {
+  if (!stockParsed) return;
+  $('btnUpStock').disabled = true; $('stockMsg').textContent = '업로드 중...';
+  try {
+    // 1) 원본(출고가 포함) → 비공개 버킷
+    await AW.replaceFile(C.bucketId, C.stockFileId, new Blob([Stock.toCSV(stockParsed)], { type: 'text/csv' }), 'stocklist.csv');
+    // 2) 모델명·일련번호만 → 공개 버킷 (조사 화면용)
+    const pub = '﻿모델명,일련번호\n' + stockParsed.map(r => [r.model, r.serial].map(csvEsc).join(',')).join('\n');
+    await AW.replaceFile(C.publicBucketId, C.pubStockFileId, new Blob([pub], { type: 'text/csv' }), 'stocklist_pub.csv');
+    $('stockMsg').innerHTML = `<span class="ok">등록 완료: ${stockParsed.length.toLocaleString()}건</span>`;
+    $('stockPreview').classList.add('hidden'); stockParsed = null;
+    showStockInfo();
   } catch (e) {
-    parsed = null;
-    $('upMsg').innerHTML = `<span class="bad">파일 오류: ${e.message}</span>`;
+    $('stockMsg').innerHTML = `<span class="bad">업로드 실패: ${esc(e.message)}</span>` + (e.code === 401 ? '<br>버킷 쓰기 권한을 확인하세요.' : e.code === 404 ? '<br>버킷이 없습니다 (stocklist / public 버킷 생성 확인).' : '');
+  } finally { $('btnUpStock').disabled = false; }
+};
+
+// ================= 판매점 목록 =================
+let storesParsed = null;
+async function showStoresInfo() {
+  try {
+    const m = await AW.fileMeta(C.publicBucketId, C.storesFileId);
+    const n = Stock.parseCSV(await AW.fileText(C.publicBucketId, C.storesFileId)).length - 1;
+    $('curStores').innerHTML = `현재 등록: <b>${n.toLocaleString()}곳</b> · ${fmt(m.$updatedAt)}`;
+  } catch (e) { $('curStores').innerHTML = e.code === 404 ? '<span class="warn">등록된 판매점 목록 없음</span>' : `<span class="bad">오류: ${esc(e.message)}</span>`; }
+}
+bindDrop('dropStores', 'fileStores', async file => {
+  $('storesMsg').textContent = ''; $('storesPreview').classList.add('hidden');
+  try {
+    const t = await readTable(file);
+    const hi = t.findIndex(r => r.some(v => /POS\s*코드|P\s*코드|pos_code/i.test(v)) && r.some(v => /판매점명|store_name/i.test(v)));
+    if (hi < 0) throw new Error('헤더에 "POS코드"(또는 P코드)와 "판매점명" 컬럼이 필요합니다');
+    const h = t[hi].map(v => String(v).trim());
+    const iC = h.findIndex(v => /POS\s*코드|P\s*코드|pos_code/i.test(v));
+    const iN = h.findIndex(v => /판매점명|store_name/i.test(v));
+    const iR = h.findIndex(v => /비고|remarks/i.test(v));
+    const map = new Map(); let ended = 0, noCode = 0;
+    for (const r of t.slice(hi + 1)) {
+      const code = String(r[iC] ?? '').trim(), name = String(r[iN] ?? '').trim();
+      if (!name) continue;
+      if (iR >= 0 && /\[end\]/i.test(String(r[iR] ?? ''))) { ended++; continue; }   // 종료 판매점 제외
+      if (!code) noCode++;
+      map.set(code || name, { code, name });
+    }
+    storesParsed = [...map.values()].sort((a, b) => a.code.localeCompare(b.code));
+    if (!storesParsed.length) throw new Error('판매점 데이터가 없습니다');
+    $('storesStats').innerHTML = `<div><b>${storesParsed.length.toLocaleString()}</b>등록할 판매점</div><div><b>${ended}</b>[end] 종료점 제외</div><div><b class="${noCode ? 'warn' : ''}">${noCode}</b>P코드 없음</div>`;
+    $('storesTbl').innerHTML = '<tr><th>P코드</th><th>판매점명</th></tr>' + storesParsed.slice(0, 5).map(s => `<tr><td class="mono">${esc(s.code)}</td><td>${esc(s.name)}</td></tr>`).join('');
+    $('storesPreview').classList.remove('hidden');
+  } catch (e) { storesParsed = null; $('storesMsg').innerHTML = `<span class="bad">파일 오류: ${esc(e.message)}</span>`; }
+});
+$('btnUpStores').onclick = async () => {
+  if (!storesParsed) return;
+  $('btnUpStores').disabled = true; $('storesMsg').textContent = '업로드 중...';
+  try {
+    const csv = '﻿P코드,판매점명\n' + storesParsed.map(s => [s.code, s.name].map(csvEsc).join(',')).join('\n');
+    await AW.replaceFile(C.publicBucketId, C.storesFileId, new Blob([csv], { type: 'text/csv' }), 'stores.csv');
+    $('storesMsg').innerHTML = `<span class="ok">등록 완료: ${storesParsed.length.toLocaleString()}곳</span>`;
+    $('storesPreview').classList.add('hidden'); storesParsed = null;
+    showStoresInfo();
+  } catch (e) { $('storesMsg').innerHTML = `<span class="bad">업로드 실패: ${esc(e.message)}</span>`; }
+  finally { $('btnUpStores').disabled = false; }
+};
+
+// ================= 입력완료 내역 =================
+let entries = [];   // [{pcode, store, model, serial, serialRaw, matched, at}]
+async function loadSurveys() {
+  $('svMsg').textContent = ''; $('svInfo').textContent = '불러오는 중...';
+  try {
+    const docs = await AW.listAll(C.databaseId, C.surveyCollectionId, 500, n => { $('svInfo').textContent = `불러오는 중... ${n}`; });
+    entries = [];
+    for (const d of docs) {
+      let its = []; try { its = JSON.parse(d.items || '[]'); } catch (e) {}
+      for (const x of its) entries.push({ pcode: d.pcode, store: d.store, model: x.m || '', serial: x.s || '', serialRaw: x.r || x.s || '', matched: !!x.k, at: d.$createdAt });
+    }
+    const stores = new Set(entries.map(e => e.store));
+    $('svInfo').textContent = `${docs.length}회 전송`;
+    $('svStats').innerHTML = `<div><b>${entries.length.toLocaleString()}</b>입력 단말</div><div><b>${stores.size}</b>판매점</div><div><b class="${entries.some(e => !e.matched) ? 'warn' : ''}">${entries.filter(e => !e.matched).length}</b>재고 미등록</div>`;
+    const MAX = 500;
+    $('svBody').innerHTML = entries.length
+      ? entries.slice(0, MAX).map((e, i) => `<tr><td class="n">${i + 1}</td><td>${esc(e.store)}</td><td${e.matched ? '' : ' class="warn"'}>${e.matched ? esc(e.model) : '재고 미등록'}</td><td class="mono">${esc(e.serial)}</td></tr>`).join('')
+        + (entries.length > MAX ? `<tr><td colspan="4" style="color:var(--sub)">… 최근 ${MAX}건만 표시 (전체는 [입력건 다운로드])</td></tr>` : '')
+      : '<tr><td colspan="4" style="color:var(--sub)">입력된 내역이 없습니다</td></tr>';
+  } catch (e) {
+    $('svInfo').textContent = '';
+    $('svBody').innerHTML = `<tr><td colspan="4" class="bad">불러오기 실패: ${esc(e.message)}</td></tr>`;
   }
 }
+$('btnSvReload').onclick = loadSurveys;
 
-$('file').onchange = e => e.target.files[0] && handleFile(e.target.files[0]);
-const drop = $('drop');
-drop.ondragover = e => { e.preventDefault(); drop.classList.add('over'); };
-drop.ondragleave = () => drop.classList.remove('over');
-drop.ondrop = e => { e.preventDefault(); drop.classList.remove('over'); e.dataTransfer.files[0] && handleFile(e.dataTransfer.files[0]); };
+function saveXlsx(rows, header, name) {
+  const ws = XLSX.utils.aoa_to_sheet([header, ...rows]);
+  ws['!cols'] = header.map(h => ({ wch: h === '모델명' || h === '판매점명' || h === '입력판매점' ? 24 : 16 }));
+  const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, '재고조사');
+  const blob = new Blob([XLSX.write(wb, { bookType: 'xlsx', type: 'array' })],
+                        { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = name;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+}
 
-$('btnUpload').onclick = async () => {
-  if (!parsed) return;
-  const blob = new Blob([Stock.toCSV(parsed.rows)], { type: 'text/csv' });
-  if (blob.size > 5 * 1024 * 1024) { $('upMsg').innerHTML = '<span class="bad">5MB 초과 — 행 수를 줄여주세요</span>'; return; }
-  $('btnUpload').disabled = true; $('upMsg').textContent = '업로드 중...';
+// 입력건 다운로드: 입력된 리스트만
+$('btnDlInput').onclick = () => {
+  if (!entries.length) return alert('입력된 내역이 없습니다');
+  saveXlsx(entries.map(e => [e.store, e.matched ? e.model : '재고 미등록', e.serial]),
+           ['판매점명', '모델명', '일련번호'], `재고조사_입력건_${today()}.xlsx`);
+};
+
+// 전체 다운로드: 재고리스트 기준 + 조사완료여부(Y/N) + 입력판매점
+$('btnDlAll').onclick = async () => {
+  $('btnDlAll').disabled = true; $('svMsg').textContent = '전체 데이터 만드는 중...';
   try {
-    try { await AW.deleteFile(C.bucketId, C.stockFileId); } catch (e) { if (e.code !== 404) throw e; }
-    await AW.uploadFile(C.bucketId, C.stockFileId, blob, 'stocklist.csv');
-    $('upMsg').innerHTML = `<span class="ok">등록 완료: ${parsed.rows.length.toLocaleString()}건</span>`;
-    $('preview').classList.add('hidden');
-    showCurrent();
+    const rows = await getStockRows(true);
+    // 입력 일련번호 → 입력건들 (전체/끝알파벳제거/7자리 키 모두 등록)
+    const byKey = new Map();
+    for (const e of entries) for (const k of new Set([...Stock.keysOf(e.serial), ...Stock.keysOf(e.serialRaw)])) {
+      if (!byKey.has(k)) byKey.set(k, []); byKey.get(k).push(e);
+    }
+    let done = 0;
+    const out = rows.map(r => {
+      const hits = new Set();
+      for (const k of Stock.keysOf(r.serial)) for (const e of byKey.get(k) || []) {
+        // 7자리만 같은 다른 모델과 섞이지 않도록: 조사 때 매칭된 모델명이 이 행 모델과 같을 때만 인정
+        if (!e.matched || e.model.split(' / ').includes(r.model)) hits.add(e.store);
+      }
+      if (hits.size) done++;
+      return [r.model, r.serial, r.price || 0, hits.size ? 'Y' : 'N', [...hits].join(', ')];
+    });
+    saveXlsx(out, ['모델명', '일련번호', '출고가', '조사완료여부', '입력판매점'], `재고조사_전체_${today()}.xlsx`);
+    $('svMsg').innerHTML = `<span class="ok">전체 ${rows.length.toLocaleString()}건 중 조사완료 ${done.toLocaleString()}건 (Y) · 미조사 ${(rows.length - done).toLocaleString()}건 (N)</span>`;
   } catch (e) {
-    $('upMsg').innerHTML = `<span class="bad">업로드 실패: ${e.message}</span>` +
-      (e.code === 401 ? '<br>이 계정에 버킷 쓰기 권한이 없습니다 (버킷 권한 설정 확인).' : '');
-  } finally { $('btnUpload').disabled = false; }
+    $('svMsg').innerHTML = `<span class="bad">전체 다운로드 실패: ${esc(e.message)}</span>` + (e.code === 404 ? ' (재고리스트를 먼저 업로드하세요)' : '');
+  } finally { $('btnDlAll').disabled = false; }
 };
 
 boot();
