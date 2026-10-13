@@ -107,9 +107,9 @@
   </div>
 </main>
 
-<script src="config.js?v=20261013n"></script>
-<script src="appwrite.js?v=20261013n"></script>
-<script src="stock.js?v=20261013n"></script>
+<script src="config.js?v=20261013p"></script>
+<script src="appwrite.js?v=20261013p"></script>
+<script src="stock.js?v=20261013p"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script>
 const $ = id => document.getElementById(id);
@@ -271,7 +271,11 @@ async function loadSurveys() {
     try { curIdx = Stock.buildIndex(await getStockRows(true)); } catch (e) {}
     if (curIdx) for (const e of entries) {
       const m = curIdx.find([e.serialRaw, e.serial]);
-      if (m.rows.length) { e.model = [...new Set(m.rows.map(r => r.model))].join(' / '); e.gone = false; e.matched = true; }
+      if (m.rows.length) {
+        const ms = [...new Set(m.rows.map(r => r.model))];
+        e.model = ms.includes(e.model) ? e.model : ms.join(' / ');   // 조사 때 고른 모델 유지
+        e.gone = false; e.matched = true;
+      }
       else { e.gone = e.matched; e.matched = false; }   // 조사 땐 있었는데 새 재고리스트엔 없음
     }
     const stores = new Set(entries.map(e => e.store));
