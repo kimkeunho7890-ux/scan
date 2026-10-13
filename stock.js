@@ -71,15 +71,14 @@
       // 스캔된 일련번호 후보들로 조회: 전체 일치 우선, 없으면 7자리 일치
       find(candidates) {
         const keys = [...new Set(candidates.flatMap(keysOf))];
-        keys.sort((a, b) => b.length - a.length);           // 긴(정확한) 키 먼저
-        for (const k of keys) {
-          const hit = byKey.get(k);
-          if (hit) {
-            const uniq = [...new Map(hit.map(r => [r.model + '|' + r.serial, r])).values()];
-            return { rows: uniq, key: k };
-          }
+        const uniq = rows => [...new Map(rows.map(r => [r.model + '|' + r.serial, r])).values()];
+        // 1) 영문이 섞인 전체 일련번호가 정확히 일치하면 그것만 사용
+        for (const k of keys.filter(k => /[A-Z]/.test(k)).sort((a, b) => b.length - a.length)) {
+          const hit = byKey.get(k); if (hit) return { rows: uniq(hit), key: k };
         }
-        return { rows: [], key: null };
+        // 2) 숫자 일련번호(7자리·앞자리 0 제거 등)는 걸리는 행을 모두 모음 → 여러 모델이면 화면에서 선택
+        const all = keys.filter(k => /^\d+$/.test(k)).flatMap(k => byKey.get(k) || []);
+        return all.length ? { rows: uniq(all), key: 'num' } : { rows: [], key: null };
       }
     };
   }
