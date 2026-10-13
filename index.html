@@ -62,6 +62,14 @@
   @keyframes dupflash{from{background:rgba(239,68,68,.35)}to{background:transparent}}
   #dupMsg{color:var(--bad);font-weight:700;font-size:15px;min-height:22px;margin-top:10px;transition:opacity .3s}
   #dupMsg.off{opacity:0}
+  #chooser{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:50;display:flex;align-items:flex-end;justify-content:center}
+  #chooser .sheet{background:var(--card);border-top-left-radius:18px;border-top-right-radius:18px;width:100%;max-width:560px;padding:18px 16px calc(18px + env(safe-area-inset-bottom))}
+  #chooser h3{margin:0 0 4px;font-size:18px}
+  #chooser .sn{color:var(--sub);font-size:13px;margin-bottom:14px;font-family:ui-monospace,Menlo,Consolas,monospace}
+  #chooser .opts{display:grid;gap:8px}
+  #chooser .opts button{padding:16px;font-size:17px;text-align:left;background:#0f1115}
+  #chooser .opts button:active{background:var(--acc);color:#04261b}
+  #chooser .cancel{width:100%;margin-top:10px;color:var(--sub);background:transparent}
   @keyframes flash{from{background:rgba(16,185,129,.35)}to{background:transparent}}
   .empty{color:#555;padding:10px 0}
   .hidden{display:none!important}
@@ -112,7 +120,7 @@
   </div>
   <div id="recentPick" class="hidden"></div>
   <div class="info" style="justify-content:center"><span id="dataInfo">판매점·재고 목록 불러오는 중...</span><a id="btnReload">새로고침</a></div>
-  <div class="ver">버전 20261013n</div>
+  <div class="ver">버전 20261013p</div>
 </div>
 
 <!-- 조사 화면 -->
@@ -142,11 +150,17 @@
   </div>
 </main>
 </div>
+<div id="chooser" class="hidden"><div class="sheet">
+  <h3>모델을 선택하세요</h3>
+  <div class="sn" id="chSerial"></div>
+  <div class="opts" id="chOpts"></div>
+  <button class="cancel" id="chCancel">추가하지 않음</button>
+</div></div>
 <div class="toast" id="toast"></div>
 
-<script src="config.js?v=20261013n"></script>
-<script src="appwrite.js?v=20261013n"></script>
-<script src="stock.js?v=20261013n"></script>
+<script src="config.js?v=20261013p"></script>
+<script src="appwrite.js?v=20261013p"></script>
+<script src="stock.js?v=20261013p"></script>
 <script type="module">
 const $ = id => document.getElementById(id);
 const C = window.APP_CONFIG;
@@ -288,10 +302,19 @@ const samsungBase = t => (t.length === 13 || t.length === 16) ? t.slice(0, -1) :
 // 표시용: 인쇄 일련번호의 끝 숫자 7자리 (CTLSM01077187 → 0107718)
 const serial7 = s => { const m = samsungBase(String(s)).match(/(\d{7})$/); return m ? m[1] : null; };
 
-function lookupModel(cands) {
-  if (!stockIdx) return { model: '', matched: false };
+// 일련번호 → 재고 모델 후보. 같은 일련번호가 여러 모델에 있으면 바코드 원본에 든 모델코드로 먼저 좁힘
+//   예) 원본 SML345AK11616199 + 후보 [SM-L345N, SM-A176L] → "L345"가 들어 있는 SM-L345N 자동 선택
+function lookupModel(cands, raw = '') {
+  if (!stockIdx) return { model: '', matched: false, options: [] };
   const m = stockIdx.find(cands);
-  return m.rows.length ? { model: m.rows.map(r => r.model).filter((v, i, a) => a.indexOf(v) === i).join(' / '), matched: true } : { model: '', matched: false };
+  let models = [...new Set(m.rows.map(r => r.model))];
+  if (models.length > 1 && raw) {
+    const R = raw.toUpperCase().replace(/[^A-Z0-9]/g, '');
+    const hit = models.filter(md => { const c = md.toUpperCase().match(/SM-?([A-Z]\d{3})/); return c && R.includes(c[1]); });
+    if (hit.length >= 1) models = hit;
+  }
+  if (!models.length) return { model: '', matched: false, options: [] };
+  return { model: models[0], matched: true, options: models };
 }
 // 바코드 묶음에서 일련번호만 추출
 function serialsFrom(results) {
@@ -331,7 +354,31 @@ function showDup(x) {
   if (row) { row.classList.remove('dup'); void row.offsetWidth; row.classList.add('dup'); }
   haptic(true); beep(600);
 }
+// ---- 모델 선택창 (같은 일련번호가 여러 모델에 있을 때) ----
+const pending = [];   // [{serial, raw, options}]
+function openChooser() {
+  if (!pending.length || !$('chooser').classList.contains('hidden')) return;
+  const p = pending[0];
+  $('chSerial').textContent = `일련번호 ${p.serial}  (원본 ${p.raw})`;
+  $('chOpts').innerHTML = p.options.map((m, i) => `<button data-i="${i}">${esc(m)}</button>`).join('');
+  $('chOpts').querySelectorAll('button').forEach(b => b.onclick = () => closeChooser(p.options[+b.dataset.i]));
+  $('chooser').classList.remove('hidden');
+  haptic(true); beep(1000);
+}
+function closeChooser(model) {
+  const p = pending.shift();
+  $('chooser').classList.add('hidden');
+  if (model && p && !list.some(x => x.serial === p.serial)) {
+    list.push({ model, serial: p.serial, serialRaw: p.raw, matched: true, _new: true });
+    recentAdd.set(p.serial, Date.now());
+    haptic(); beep(); saveDraft(); renderList();
+  } else if (p) recentAdd.set(p.serial, Date.now());   // 취소한 박스가 바로 다시 뜨지 않게
+  if (pending.length) setTimeout(openChooser, 150);
+}
+$('chCancel').onclick = () => closeChooser(null);
+
 function addSerials(found) {
+  if (!$('chooser').classList.contains('hidden')) return 0;   // 선택창이 떠 있는 동안은 인식 멈춤
   let added = 0; const now = Date.now();
   for (const f of found) {
     const ex = list.find(x => x.serial === f.serial);
@@ -341,8 +388,11 @@ function addSerials(found) {
       recentWarn.set(f.serial, now); showDup(ex);
       continue;
     }
-    const { model, matched } = lookupModel(f.cands);
-    list.push({ model, serial: f.serial, serialRaw: f.raw, matched, _new: true });
+    if (pending.some(p => p.serial === f.serial)) continue;          // 이미 선택 대기 중
+    if (now - (recentAdd.get(f.serial) || 0) < 2500) continue;       // 방금 취소한 박스
+    const r = lookupModel(f.cands, f.raw);
+    if (r.options.length > 1) { pending.push({ serial: f.serial, raw: f.raw, options: r.options }); openChooser(); continue; }
+    list.push({ model: r.model, serial: f.serial, serialRaw: f.raw, matched: r.matched, _new: true });
     recentAdd.set(f.serial, now);
     added++;
   }
@@ -367,7 +417,7 @@ function renderList() {
 }
 function relabel() {   // 재고리스트가 늦게 로드된 경우 모델명 다시 채움
   let ch = false;
-  for (const x of list) if (!x.matched) { const r = lookupModel([x.serialRaw, x.serial]); if (r.matched) { Object.assign(x, r); ch = true; } }
+  for (const x of list) if (!x.matched) { const r = lookupModel([x.serialRaw, x.serial], x.serialRaw); if (r.options.length === 1) { x.model = r.model; x.matched = true; ch = true; } }
   if (ch) saveDraft(); renderList();
 }
 function updateSend() { $('btnSend').disabled = !(picked && list.length); }
@@ -497,7 +547,7 @@ $('file').onchange = async e => {
     const c = document.createElement('canvas'); c.width = Math.round(bmp.width * k); c.height = Math.round(bmp.height * k);
     const cx = c.getContext('2d', { willReadFrequently: true }); cx.drawImage(bmp, 0, 0, c.width, c.height);
     const n = addSerials(serialsFrom(await readBarcodes(cx.getImageData(0, 0, c.width, c.height), READ_OPTS)));
-    setStatus(n ? `사진에서 ${n}건 추가` : ($('dupMsg').classList.contains('off') ? '사진에서 새 일련번호를 찾지 못했습니다' : ''));
+    setStatus(n ? `사진에서 ${n}건 추가` : !$('chooser').classList.contains('hidden') ? '모델 선택 대기 중' : ($('dupMsg').classList.contains('off') ? '사진에서 새 일련번호를 찾지 못했습니다' : ''));
   } catch (err) { setStatus('사진 분석 실패: ' + err.message); }
   e.target.value = '';
 };
