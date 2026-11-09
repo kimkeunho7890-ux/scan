@@ -6,6 +6,7 @@ window.APP_CONFIG = {
   // 비공개 버킷: 출고가 포함 기준재고 원본 (관리자만)
   bucketId:     'stocklist',
   baseFileId:   'base',
+  lostFileId:   'lost',         // 분실 목록 (모델명, 일련번호, 기존분실건, 비고)
 
   // 공개 버킷: 로그인 없는 조사 화면이 읽는 파일 (출고가·주소·연락처 없음)
   publicBucketId: 'public',
