@@ -60,7 +60,8 @@
     const curMap = new Map(); if (cur) for (const c of cur) curMap.set(key(c.model, c.serial), c);
     const items = base.map(b => {
       const k = key(b.model, b.serial), c = cur ? (curMap.get(k) || null) : b, sv = surveyed.get(k) || null;
-      const moved = !!(c && storeId(c) !== storeId(b));
+      // 이관: 판매점(P코드)이 바뀌었거나, 같은 P코드라도 담당 영업사원(POS그룹명)이 바뀐 경우
+      const moved = !!(c && (storeId(c) !== storeId(b) || (c.group || '') !== (b.group || '')));
       // 원래 판매점에서 조사된 입력인지 (그 판매점 P코드로 입력했거나, 담당 영업사원 이름으로 입력)
       const svAtBase = !!(sv && (sv.pcode === b.posCode || (sv.staff && sv.staff === b.group)));
       const owner = moved && !svAtBase ? c : b;            // 통계에 잡히는 판매점
@@ -82,9 +83,9 @@
       const kb = fb ? kf(it.b) : null, ko = fo ? kf(it.owner) : null;
       if (fb) get(kb, it.b).base0++;
       if (fo) { const a = get(ko, it.owner); a.base++; a[it.status]++; }
-      if (it.owner !== it.b && kb !== ko) {               // 다른 단위로 이관된 경우만 출고/입고로 셈
-        if (fb && kf(it.b) !== kf(it.owner)) get(kb, it.b).out++;
-        if (fo && kf(it.b) !== kf(it.owner)) get(ko, it.owner).in++;
+      if (it.owner !== it.b) {                            // 보고 있는 범위 밖으로 나갔거나 다른 행으로 옮겨진 경우만 출고/입고
+        if (fb && (!fo || kb !== ko)) get(kb, it.b).out++;
+        if (fo && (!fb || kb !== ko)) get(ko, it.owner).in++;
       }
     }
     return { map, names };
@@ -92,9 +93,10 @@
   const sum = list => list.reduce((t, a) => { for (const k in t) t[k] += a[k] || 0; return t; }, empty());
 
   // 판매점(POS코드)별 미완료 목록: 지금 그 판매점에 있는 미조사 단말 (이관입고 표시 포함)
-  function todoList(res, sid) {
-    return res.items.filter(it => it.status === 'todo' && storeId(it.owner) === sid)
-      .map(it => ({ r: it.c || it.b, tag: storeId(it.b) !== sid ? '이관입고' : '', from: storeId(it.b) !== sid ? it.b.nick : '' }));
+  // group 을 주면 그 담당(POS그룹명) 소속으로 집계된 것만 (같은 P코드가 두 담당에 걸친 경우 구분)
+  function todoList(res, sid, group) {
+    return res.items.filter(it => it.status === 'todo' && storeId(it.owner) === sid && (group == null || (it.owner.group || '(미지정)') === group))
+      .map(it => { const mv = it.owner !== it.b; return { r: it.c || it.b, tag: mv ? '이관입고' : '', from: mv ? `${it.b.nick}${it.b.group !== it.owner.group ? ' / ' + it.b.group : ''}` : '' }; });
   }
 
   // ---------- 드릴다운 화면 ----------
@@ -137,7 +139,7 @@
         return i < path.length - 1 && i >= minDepth ? `<a data-up="${i}">${esc(label)}</a> ›` : `<b>${esc(label)}</b>${i < path.length - 1 ? ' ›' : ''}`;
       }).slice(minDepth).join(' ');
       let html = `<div class="st-crumb">${crumb}</div>`;
-      if (cur.level === 'store') html += listHtml(cur.v);
+      if (cur.level === 'store') { const par = path[path.length - 2]; html += listHtml(cur.v, par && par.level === 'group' ? par.v : null); }
       else html += tableHtml(cur);
       if (!res.hasCur) html += `<div class="st-note">※ 현재재고가 등록되지 않아 개통완료·이관은 반영되지 않았습니다.</div>`;
       el.innerHTML = html;
@@ -171,9 +173,9 @@
       <div class="st-note">· 기준재고: 이관을 반영한 조정 수량 (다른 판매점으로 옮겨진 미조사 단말은 옮겨 간 곳에서 조사)<br>
       · 개통완료: 기준재고에 있었는데 현재재고에 없는 단말 · 진행률 = (입력완료+개통완료) ÷ 기준재고<br>· 행을 누르면 하위 목록으로 이동합니다</div>`;
     };
-    const listHtml = sid => {
-      const rows = todoList(res, sid);
-      const a = aggregate(res, 'store', r => storeId(r) === sid).map.get(sid) || empty();
+    const listHtml = (sid, group) => {
+      const rows = todoList(res, sid, group);
+      const a = aggregate(res, 'store', r => storeId(r) === sid && (group == null || (r.group || '(미지정)') === group)).map.get(sid) || empty();
       const head = `<div class="st-note" style="margin:0 0 8px">기준재고 ${n(a.base)}${(a.out || a.in) ? ` (원래 ${n(a.base0)}${a.out ? ' −' + n(a.out) : ''}${a.in ? ' +' + n(a.in) : ''})` : ''} · 입력완료 <b style="color:#22c55e">${n(a.done)}</b> · 개통완료 ${n(a.sold)} · <b style="color:#f59e0b">미완료 ${n(rows.length)}</b></div>`;
       if (!rows.length) return head + '<div class="st-empty">조사 미완료 재고가 없습니다</div>';
       rows.sort((x, y) => x.r.model.localeCompare(y.r.model) || canon(x.r.serial).localeCompare(canon(y.r.serial)));
