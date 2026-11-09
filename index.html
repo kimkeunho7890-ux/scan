@@ -2,620 +2,650 @@
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>재고조사 관리자</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>실물 재고조사</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#047857">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="재고조사">
 <style>
-  :root{--bg:#0f1115;--card:#1a1d24;--line:#2a2f3a;--txt:#e8eaf0;--sub:#9aa3b2;--acc:#3b82f6;--grn:#10b981;--ok:#22c55e;--warn:#f59e0b;--bad:#ef4444}
-  *{box-sizing:border-box}
+  :root{--bg:#0f1115;--card:#1a1d24;--line:#2a2f3a;--txt:#e8eaf0;--sub:#9aa3b2;--acc:#10b981;--blue:#3b82f6;--ok:#22c55e;--warn:#f59e0b;--bad:#ef4444}
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
   body{margin:0;background:var(--bg);color:var(--txt);font-family:-apple-system,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;font-size:15px}
-  header{padding:12px 16px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center}
-  header h1{font-size:17px;margin:0}
-  header a{color:var(--acc);cursor:pointer;font-size:13px;margin-left:10px}
-  main{max-width:900px;margin:0 auto;padding:16px}
-  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:12px}
-  .card h2{font-size:15px;margin:0 0 10px;font-weight:700;display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
-  .card h2 small{font-weight:400;color:var(--sub);font-size:12px}
-  input[type=email],input[type=password]{width:100%;background:#0f1115;color:var(--txt);border:1px solid var(--line);border-radius:8px;padding:10px;font-size:15px;margin-bottom:8px}
-  button{background:var(--acc);color:#fff;border:0;border-radius:10px;padding:11px 14px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit}
-  button.sec{background:#374151}
-  button.grn{background:var(--grn);color:#04261b}
+  header{padding:12px 16px;padding-top:max(12px,env(safe-area-inset-top));border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between}
+  header h1{font-size:19px;margin:0;letter-spacing:-.3px}
+  main{padding:12px 16px 60px;max-width:720px;margin:0 auto}
+  #installBar{display:none;padding:10px 16px;background:#047857}
+  #installBar button{width:100%;background:#fff;color:#047857;border:0;font-size:16px;font-weight:800;padding:12px;border-radius:10px;font-family:inherit}
+  label.fl{display:block;font-size:13px;color:var(--sub);margin:0 0 6px;font-weight:600}
+  input[type=search]{width:100%;background:#0f1115;color:var(--txt);border:1px solid var(--line);border-radius:10px;padding:13px;font-size:17px;font-family:inherit}
+  .ac{position:relative}
+  #sugg{position:absolute;left:0;right:0;top:100%;margin-top:4px;background:#111827;border:1px solid var(--line);border-radius:10px;max-height:300px;overflow:auto;z-index:20;box-shadow:0 10px 30px rgba(0,0,0,.5)}
+  #sugg div{padding:11px 12px;border-bottom:1px solid var(--line);cursor:pointer;display:flex;gap:10px}
+  #sugg div:last-child{border-bottom:0}
+  #sugg div.on,#sugg div:hover{background:#1f2937}
+  #sugg b{font-family:ui-monospace,Menlo,Consolas,monospace;color:var(--acc);min-width:70px}
+  #sugg .none{color:var(--sub);cursor:default}
+  #picked{margin-top:8px;padding:11px 12px;border-radius:10px;background:rgba(16,185,129,.12);border:1px solid rgba(16,185,129,.4);display:flex;justify-content:space-between;align-items:center;font-size:16px}
+  #picked b{font-family:ui-monospace,Menlo,Consolas,monospace;margin-right:8px;color:var(--acc)}
+  #picked a{color:var(--sub);font-size:13px;cursor:pointer}
+  .info{font-size:12px;color:var(--sub);margin-top:8px;display:flex;justify-content:space-between;gap:8px}
+  .info a{color:var(--blue);cursor:pointer;white-space:nowrap}
+  .cam{position:relative;background:#000;border-radius:12px;overflow:hidden;aspect-ratio:4/3;width:100%;margin-top:12px}
+  video{width:100%;height:100%;object-fit:cover;display:block}
+  .box{position:absolute;left:5%;right:5%;top:25%;height:50%;border:2px solid rgba(255,255,255,.85);border-radius:8px;box-shadow:0 0 0 9999px rgba(0,0,0,.35);pointer-events:none;transition:border-color .15s}
+  .box.hit{border-color:var(--ok)}
+  .cam .camMsg{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;padding:20px;color:#ccc;font-size:14px;white-space:pre-line}
+  .btns{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:10px}
+  button,.filebtn{background:var(--card);color:var(--txt);border:1px solid var(--line);border-radius:10px;padding:13px 4px;font-size:15px;font-weight:700;text-align:center;cursor:pointer;font-family:inherit}
+  .filebtn input{display:none}
+  button.cam-on{background:var(--blue);border-color:var(--blue);color:#fff}
+  button.send{background:var(--acc);border-color:var(--acc);color:#04261b}
   button:disabled{opacity:.4}
-  .drop{display:block;border:2px dashed var(--line);border-radius:12px;padding:22px;text-align:center;color:var(--sub);cursor:pointer}
-  .drop.over{border-color:var(--acc);color:var(--txt)}
-  .stats{display:flex;gap:16px;flex-wrap:wrap;margin:10px 0;font-size:13px;color:var(--sub)}
-  .stats b{font-size:18px;display:block;color:var(--txt)}
-  table{width:100%;border-collapse:collapse;font-size:13px}
-  th,td{text-align:left;padding:7px 6px;border-bottom:1px solid var(--line)}
-  th{color:var(--sub);font-weight:600;position:sticky;top:0;background:var(--card)}
-  td.mono{font-family:ui-monospace,Menlo,Consolas,monospace}
-  td.n{text-align:right;font-variant-numeric:tabular-nums}
-  .scroll{max-height:60vh;overflow:auto;border:1px solid var(--line);border-radius:8px}
-  .msg{font-size:13px;margin-top:8px}
-  .ok{color:var(--ok)} .bad{color:var(--bad)} .warn{color:var(--warn)}
-  .btnrow{display:flex;gap:8px;flex-wrap:wrap}
-  .cur{font-size:13px;color:var(--sub);margin-bottom:10px}
-  .cur b{color:var(--txt)}
+  #status{font-size:12px;color:var(--sub);margin-top:6px;min-height:1em}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 14px;margin-top:12px}
+  .card h2{font-size:14px;margin:0 0 4px;color:var(--sub);font-weight:600;display:flex;justify-content:space-between}
+  #list .it{display:grid;grid-template-columns:26px 1fr auto 26px;gap:6px;align-items:center;padding:9px 0;border-bottom:1px dashed var(--line)}
+  #list .it:last-child{border-bottom:0}
+  #list .n{color:var(--sub);font-size:12px}
+  #list .m{font-weight:700;word-break:break-all}
+  #list .m.no{color:var(--warn);font-weight:600}
+  #list .s{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:14px;text-align:right}
+  #list .s small{display:block;font-size:10px;color:var(--sub)}
+  .ver{text-align:center;font-size:11px;color:#555;margin-top:18px}
+  #list .x{background:none;border:0;color:var(--bad);font-size:20px;padding:0;line-height:1}
+  #list .it.new{animation:flash 1s}
+  #list .it.dup{animation:dupflash 1.2s}
+  @keyframes dupflash{from{background:rgba(239,68,68,.35)}to{background:transparent}}
+  #dupMsg{color:var(--bad);font-weight:700;font-size:15px;min-height:22px;margin-top:10px;transition:opacity .3s}
+  #dupMsg.off{opacity:0}
+  header .hbtns{display:flex;align-items:center;gap:6px}
+  #btnStat{background:rgba(16,185,129,.15);color:var(--acc);border:1px solid rgba(16,185,129,.45);padding:7px 11px;font-size:13px;border-radius:999px}
+  #statView{position:fixed;inset:0;background:var(--bg);z-index:40;overflow:auto}
+  #statView header{position:sticky;top:0;background:var(--bg);z-index:2}
+  #statView main{padding-top:10px}
+  .st-sum{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:12px}
+  .st-sum div{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:9px 6px;text-align:center;font-size:11px;color:var(--sub)}
+  .st-sum b{display:block;font-size:18px;color:var(--txt);margin-bottom:2px}
+  #chooser{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:50;display:flex;align-items:flex-end;justify-content:center}
+  #chooser .sheet{background:var(--card);border-top-left-radius:18px;border-top-right-radius:18px;width:100%;max-width:560px;padding:18px 16px calc(18px + env(safe-area-inset-bottom))}
+  #chooser h3{margin:0 0 4px;font-size:18px}
+  #chooser .sn{color:var(--sub);font-size:13px;margin-bottom:14px;font-family:ui-monospace,Menlo,Consolas,monospace}
+  #chooser .opts{display:grid;gap:8px}
+  #chooser .opts button{padding:16px;font-size:17px;text-align:left;background:#0f1115}
+  #chooser .opts button:active{background:var(--acc);color:#04261b}
+  #chooser .cancel{width:100%;margin-top:10px;color:var(--sub);background:transparent}
+  @keyframes flash{from{background:rgba(16,185,129,.35)}to{background:transparent}}
+  .empty{color:#555;padding:10px 0}
   .hidden{display:none!important}
-  .tabs{display:flex;gap:6px;margin-bottom:12px}
-  .tabs button{flex:1;background:var(--card);border:1px solid var(--line);color:var(--sub);padding:12px;font-size:15px}
-  .tabs button.on{background:var(--acc);border-color:var(--acc);color:#fff}
-  .info{font-size:13px;color:var(--sub);line-height:1.7}
-  .info b{color:var(--txt)}
-  .reg-list{font-size:12px;color:var(--sub);margin-top:6px;line-height:1.6}
-  .rp-form{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px}
-  .rp-form label{font-size:12px;color:var(--sub);display:grid;gap:4px}
-  .rp-form label.full{grid-column:1/-1}
-  .rp-form input{background:#0f1115;color:var(--txt);border:1px solid var(--line);border-radius:8px;padding:9px;font-size:14px;font-family:inherit}
-  .rp-wrap{overflow:auto;background:#555;border-radius:8px;padding:12px;max-height:75vh}
-  /* 보고서 (흰 종이) */
-  #report{background:#fff;color:#000;width:794px;margin:0 auto;padding:28px 26px 30px;font-family:"Malgun Gothic","Apple SD Gothic Neo",sans-serif}
-  #report h1{text-align:center;font-size:23px;margin:0 0 8px;letter-spacing:.5px}
-  #report .rule{border-top:3px double #000;margin:0 0 6px}
-  #report .meta{text-align:right;font-size:13px;line-height:1.6;margin-bottom:14px;padding-right:90px}
-  #report table{width:100%;border-collapse:collapse;font-size:12.5px;margin-bottom:18px;border:2px solid #000}
-  #report th,#report td{border:1px solid #999;padding:2px 4px;text-align:center;height:19px}
-  #report th{background:#f2f2f2;color:#000;position:static;font-weight:700;border-bottom:2px solid #000;line-height:1.25}
-  #report td.n{text-align:right;padding-right:8px}
-  #report td.adj{background:#f7f7f7;font-weight:700}
-  #report .red{color:#e00;font-weight:700}
-  #report tr.tot td{background:#fff2cc;font-weight:800;border-top:2px solid #000}
-  #report tr.sep td{border-top:2px solid #000}
-  #report .sign{margin-left:auto;width:420px;border:2px solid #000;display:grid;grid-template-columns:36px repeat(5,1fr)}
-  #report .sign div{border-left:1px solid #000;text-align:center}
-  #report .sign .k{grid-row:1/3;border-left:0;display:flex;align-items:center;justify-content:center;writing-mode:vertical-rl;font-weight:800;font-size:16px;letter-spacing:6px}
-  #report .sign .h{border-bottom:1px solid #000;padding:8px 0;font-weight:800;font-size:16px}
-  #report .sign .b{height:80px}
+  /* 진입 화면 (로그인처럼) */
+  #entryView{max-width:400px;margin:0 auto;padding:56px 20px 40px}
+  #entryView .logo{width:72px;height:72px;border-radius:18px;display:block;margin:0 auto 14px}
+  #entryView h1{text-align:center;font-size:26px;margin:0 0 6px;letter-spacing:-.5px}
+  #entryView .sub{text-align:center;color:var(--sub);font-size:13px;margin-bottom:26px}
+  .chips{display:flex;gap:8px;justify-content:center;margin-bottom:16px}
+  .chip{border-radius:999px;padding:10px 22px;font-size:15px;font-weight:700;background:transparent;border:1.5px solid var(--line);color:var(--sub)}
+  .chip.on{background:var(--acc);border-color:var(--acc);color:#04261b}
+  .entryBox{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px}
+  .entryBox .go{width:100%;margin-top:10px;background:var(--acc);border-color:var(--acc);color:#04261b;font-size:16px}
+  #recentPick{margin-top:14px;text-align:center;font-size:13px;color:var(--sub)}
+  #recentPick a{color:var(--acc);cursor:pointer;font-weight:700}
+  .who{display:flex;align-items:center;gap:8px;min-width:0}
+  .who .k{font-size:11px;padding:2px 8px;border-radius:999px;background:rgba(16,185,129,.15);color:var(--acc);font-weight:700;white-space:nowrap}
+  .who .k.staff{background:rgba(59,130,246,.15);color:var(--blue)}
+  .who b{font-size:16px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .who code{color:var(--sub);font-size:12px}
+  header a.chg{color:var(--sub);font-size:13px;cursor:pointer;white-space:nowrap;margin-left:8px}
+  .toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom));transform:translateX(-50%);background:#111;border:1px solid var(--line);padding:10px 16px;border-radius:10px;font-size:14px;z-index:99;opacity:0;transition:opacity .2s;pointer-events:none;max-width:90vw;text-align:center}
+  .toast.show{opacity:1}
 </style>
 </head>
 <body>
-<header><h1>재고조사 관리자</h1><div><span id="me" style="font-size:12px;color:var(--sub)"></span><a href="./">조사 화면</a><a id="btnLogout" class="hidden">로그아웃</a></div></header>
-<main>
-  <div class="card" id="loginCard" style="max-width:380px;margin:40px auto">
-    <h2>관리자 로그인</h2>
-    <input type="email" id="email" placeholder="이메일" autocomplete="username">
-    <input type="password" id="pw" placeholder="비밀번호" autocomplete="current-password">
-    <button id="btnLogin" style="width:100%">로그인</button>
-    <div class="msg bad" id="loginMsg"></div>
+<div id="installBar"><button id="btnInstall">실물 재고조사 앱 설치 (바로가기)</button></div>
+<!-- 진입 화면 -->
+<div id="entryView">
+  <img class="logo" src="icon-192.png" alt="">
+  <h1>실물 재고조사</h1>
+  <div class="sub">조사자를 선택하고 입력하세요</div>
+  <div class="chips">
+    <button class="chip on" id="chipStore">판매점</button>
+    <button class="chip" id="chipStaff">영업사원</button>
   </div>
-
-  <div id="adminBody" class="hidden">
-    <div class="tabs"><button id="tabStats" class="on">통계</button><button id="tabManage">관리</button></div>
-
-    <!-- ===== 통계 ===== -->
-    <section id="paneStats">
-      <div class="card">
-        <h2><span>조사 통계</span>
-          <span class="btnrow"><button class="sec" id="btnStReload">새로고침</button><button class="grn" id="btnDlStats">통계 다운로드</button><button class="grn" id="btnDlAll2">전체 다운로드</button></span></h2>
-        <div class="info" id="stInfo">불러오는 중...</div>
-      </div>
-      <div class="card"><div id="stView"></div></div>
-      <div class="card">
-        <h2><span>재고조사 현황 보고서 <small>결재용 양식 — 엑셀·PDF·이미지로 저장</small></span>
-          <span class="btnrow"><button class="grn" id="btnRpXlsx">엑셀</button><button class="grn" id="btnRpPdf">PDF</button><button class="grn" id="btnRpPng">이미지</button></span></h2>
-        <div class="rp-form">
-          <label class="full">제목<input id="rpTitle"></label>
-          <label>시행일<input id="rpPeriod" placeholder="2026.11.10 ~ 2026.11.13"></label>
-          <label>기준일<input id="rpDate"></label>
-        </div>
-        <div class="rp-wrap"><div id="report"></div></div>
-        <div class="msg" id="rpMsg"></div>
-      </div>
-    </section>
-
-    <!-- ===== 관리 ===== -->
-    <section id="paneManage" class="hidden">
-    <!-- 입력완료 내역 -->
-    <div class="card">
-      <h2><span>입력완료 내역 <small id="svInfo"></small></span>
-        <span class="btnrow">
-          <button class="sec" id="btnSvReload">새로고침</button>
-          <button class="grn" id="btnDlInput">입력건 다운로드</button>
-          <button class="grn" id="btnDlAll">전체 다운로드</button>
-        </span></h2>
-      <div class="stats" id="svStats"></div>
-      <div class="scroll"><table>
-        <thead><tr><th style="width:44px">No</th><th>판매점명</th><th>모델명</th><th>일련번호</th></tr></thead>
-        <tbody id="svBody"><tr><td colspan="4" style="color:var(--sub)">불러오는 중...</td></tr></tbody>
-      </table></div>
-      <div class="msg" id="svMsg"></div>
+  <div class="entryBox" id="boxStore">
+    <label class="fl" for="pcode">P코드 입력</label>
+    <div class="ac">
+      <input type="search" id="pcode" placeholder="P코드 또는 판매점명 2자 이상" autocomplete="off" autocapitalize="characters">
+      <div id="sugg" class="hidden"></div>
     </div>
+  </div>
+  <div class="entryBox hidden" id="boxStaff">
+    <label class="fl" for="staffName">영업사원 이름</label>
+    <input type="search" id="staffName" placeholder="이름 입력" autocomplete="off">
+    <button class="go" id="btnStaffGo">시작</button>
+  </div>
+  <div id="recentPick" class="hidden"></div>
+  <div class="info" style="justify-content:center"><span id="dataInfo">판매점·재고 목록 불러오는 중...</span><a id="btnReload">새로고침</a></div>
+  <div class="ver">버전 20261109g</div>
+</div>
 
-    <!-- 기준재고 -->
-    <div class="card">
-      <h2>① 기준재고 업로드 <small>재고조사 대상 리스트 · 재고 엑셀 양식 그대로 (POS코드·POS그룹명·POS닉네임·단말모델·일련번호·단말색상·출고가)</small></h2>
-      <div class="cur" id="curBase">확인 중...</div>
-      <label class="drop" id="dropBase">파일을 끌어다 놓거나 눌러서 선택<input type="file" id="fileBase" accept=".csv,.xlsx,.xls" hidden></label>
-      <div id="basePreview" class="hidden">
-        <div class="stats" id="baseStats"></div><div class="reg-list" id="baseRegs"></div>
-        <button id="btnUpBase" style="margin-top:12px;width:100%">기준재고로 등록 (기존 기준재고 교체)</button>
-      </div>
-      <div class="msg" id="baseMsg"></div>
-    </div>
+<!-- 조사 화면 -->
+<div id="scanView" class="hidden">
+<header>
+  <div class="who"><span class="k" id="whoKind">판매점</span><b id="whoName"></b><code id="whoCode"></code></div>
+  <div class="hbtns"><button id="btnStat">조사현황</button><a class="chg" id="btnChange">변경</a></div>
+</header>
+<main>
+  <div class="cam" style="margin-top:0">
+    <video id="video" playsinline muted autoplay></video>
+    <div class="box" id="box"></div>
+    <div class="camMsg" id="camMsg">[카메라]를 누르면 스캔을 시작합니다</div>
+  </div>
+  <div class="btns">
+    <button id="btnCam">카메라</button>
+    <label class="filebtn">사진파일<input type="file" id="file" accept="image/*"></label>
+    <button class="send" id="btnSend" disabled>입력완료</button>
+    <button id="btnClear">초기화</button>
+  </div>
+  <div id="status"></div>
 
-    <!-- 현재재고 -->
-    <div class="card">
-      <h2>② 현재재고 업로드 <small>같은 양식 · 기준재고와 단말모델+일련번호로 비교 → 없으면 판매, 판매점이 바뀌었으면 이관</small></h2>
-      <div class="cur" id="curCur">확인 중...</div>
-      <label class="drop" id="dropCur">파일을 끌어다 놓거나 눌러서 선택<input type="file" id="fileCur" accept=".csv,.xlsx,.xls" hidden></label>
-      <div id="curPreview" class="hidden">
-        <div class="stats" id="curStats"></div><div class="reg-list" id="curRegs"></div>
-        <button id="btnUpCur" style="margin-top:12px;width:100%">현재재고로 등록 (기존 현재재고 교체)</button>
-      </div>
-      <div class="msg" id="curMsg"></div>
-    </div>
-
-    <!-- 판매점 목록 -->
-    <div class="card">
-      <h2>판매점 목록 등록 <small>kim-gwajang.com [다운로드] 엑셀(판매점현황_*.xlsx) 그대로 업로드</small></h2>
-      <div class="cur" id="curStores">확인 중...</div>
-      <label class="drop" id="dropStores">파일을 끌어다 놓거나 눌러서 선택<input type="file" id="fileStores" accept=".csv,.xlsx,.xls" hidden></label>
-      <div id="storesPreview" class="hidden">
-        <div class="stats" id="storesStats"></div>
-        <table id="storesTbl"></table>
-        <button id="btnUpStores" style="margin-top:12px;width:100%">서버에 등록 (P코드·판매점명만 저장)</button>
-      </div>
-      <div class="msg" id="storesMsg"></div>
-    </div>
-
-    <!-- 초기화 -->
-    <div class="card" style="border-color:rgba(239,68,68,.45)">
-      <h2 style="color:var(--bad)">데이터 초기화</h2>
-      <div style="display:grid;gap:8px;font-size:14px">
-        <label><input type="checkbox" id="rsSurvey" checked> 입력완료 내역 전체 (조사 결과)</label>
-        <label><input type="checkbox" id="rsBase"> 기준재고</label>
-        <label><input type="checkbox" id="rsCur"> 현재재고</label>
-        <label><input type="checkbox" id="rsStores"> 판매점 목록</label>
-      </div>
-      <button id="btnReset" style="margin-top:12px;width:100%;background:var(--bad)">선택한 데이터 초기화</button>
-      <div class="msg" id="resetMsg"></div>
-    </div>
-    </section>
+  <div id="dupMsg" class="off"></div>
+  <div class="card" style="margin-top:4px">
+    <h2><span>인식 결과</span><span id="listCnt">0건</span></h2>
+    <div id="list"><div class="empty">바코드를 비추면 모델명·일련번호가 한 줄씩 쌓입니다</div></div>
   </div>
 </main>
+</div>
+<div id="statView" class="hidden">
+<header><b id="stTitle" style="font-size:17px">조사현황</b><a class="chg" id="btnStClose">닫기</a></header>
+<main>
+  <div class="st-sum" id="stSum"></div>
+  <div class="card" style="margin-top:0"><div id="stBody">불러오는 중...</div></div>
+  <div class="info" style="justify-content:center;margin-top:10px"><span id="stAt"></span><a id="btnStReload">새로고침</a></div>
+</main>
+</div>
+<div id="chooser" class="hidden"><div class="sheet">
+  <h3>모델을 선택하세요</h3>
+  <div class="sn" id="chSerial"></div>
+  <div class="opts" id="chOpts"></div>
+  <button class="cancel" id="chCancel">추가하지 않음</button>
+</div></div>
+<div class="toast" id="toast"></div>
 
 <script src="config.js?v=20261109g"></script>
 <script src="appwrite.js?v=20261109g"></script>
 <script src="stock.js?v=20261109g"></script>
 <script src="stats.js?v=20261109g"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<script>
+<script type="module">
 const $ = id => document.getElementById(id);
 const C = window.APP_CONFIG;
+const sleep = ms => new Promise(r => setTimeout(r, ms));
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-const today = () => { const d = new Date(); return `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`; };
-const csvEsc = v => /[",\n]/.test(String(v)) ? '"' + String(v).replace(/"/g, '""') + '"' : v;
+function toast(t, ms = 1800) { const el = $('toast'); el.textContent = t; el.classList.add('show'); clearTimeout(toast._t); toast._t = setTimeout(() => el.classList.remove('show'), ms); }
+const setStatus = t => { $('status').textContent = t; };
 
-// ================= 로그인 =================
-async function boot() {
-  let user = null;
-  try { user = await AW.me(); } catch (e) {}
-  $('loginCard').classList.toggle('hidden', !!user);
-  $('adminBody').classList.toggle('hidden', !user);
-  $('btnLogout').classList.toggle('hidden', !user);
-  if (user) { $('me').textContent = user.email; refreshAll(); }
-}
-$('btnLogin').onclick = async () => {
-  try { await AW.login($('email').value.trim(), $('pw').value); boot(); }
-  catch (e) { $('loginMsg').textContent = '로그인 실패: ' + e.message; }
+// ================= 앱 설치 =================
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+const isStandalone = () => matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+let installed = false; try { installed = localStorage.getItem('survey_installed') === '1'; } catch (e) {}
+let deferredPrompt = null;
+const updateInstallBar = () => { $('installBar').style.display = (!isStandalone() && !installed && (deferredPrompt || isIOS)) ? 'block' : 'none'; };
+addEventListener('beforeinstallprompt', e => { e.preventDefault(); deferredPrompt = e; installed = false; updateInstallBar(); });
+addEventListener('appinstalled', () => { installed = true; deferredPrompt = null; try { localStorage.setItem('survey_installed', '1'); } catch (e) {} updateInstallBar(); toast('설치 완료 — 홈 화면에서 실행하세요'); });
+$('btnInstall').onclick = async () => {
+  if (deferredPrompt) {
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    if (outcome === 'accepted') { installed = true; try { localStorage.setItem('survey_installed', '1'); } catch (e) {} }
+    deferredPrompt = null; updateInstallBar();
+  } else if (isIOS) toast('Safari 하단 [공유] → [홈 화면에 추가]를 누르세요', 4000);
 };
-$('pw').addEventListener('keydown', e => { if (e.key === 'Enter') $('btnLogin').click(); });
-$('btnLogout').onclick = async () => { await AW.logout(); location.reload(); };
+updateInstallBar();
 
-// ================= 공통: 파일 읽기 =================
-async function readTable(file) {
-  const buf = await file.arrayBuffer();
-  if (/\.xlsx?$/i.test(file.name)) {
-    const wb = XLSX.read(buf, { type: 'array' });
-    return XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, raw: false, defval: '' });
-  }
-  let text;
-  try { text = new TextDecoder('utf-8', { fatal: true }).decode(buf); } catch (e) { text = new TextDecoder('euc-kr').decode(buf); }
-  return Stock.parseCSV(text.replace(/^﻿/, ''));
-}
-function bindDrop(dropId, inputId, handler) {
-  const d = $(dropId);
-  $(inputId).onchange = e => e.target.files[0] && handler(e.target.files[0]);
-  d.ondragover = e => { e.preventDefault(); d.classList.add('over'); };
-  d.ondragleave = () => d.classList.remove('over');
-  d.ondrop = e => { e.preventDefault(); d.classList.remove('over'); e.dataTransfer.files[0] && handler(e.dataTransfer.files[0]); };
-}
-const fmt = s => new Date(s).toLocaleString('ko-KR');
+// ================= 데이터 (판매점 / 재고) =================
+let stores = [];           // [{code, name}]
+let stockIdx = null;       // 일련번호 → 모델명
+let baseRows = null, curRows = null;   // 기준재고 / 현재재고 (조사현황용)
+let picked = null;         // {code, name}
 
-// ================= 데이터 로드 =================
-let baseRows = null, curRows = null, entries = [], svDocs = [], dupCnt = 0, statRes = null;
-const loadRows = async (bucket, id) => Stock.toStockRows(Stock.parseCSV(await AW.fileText(bucket, id)));
-async function loadBase() { try { baseRows = await loadRows(C.bucketId, C.baseFileId); } catch (e) { baseRows = null; if (e.code !== 404) throw e; } return baseRows; }
-async function loadCur()  { try { curRows  = await loadRows(C.publicBucketId, C.curPubFileId); } catch (e) { curRows = null; if (e.code !== 404) throw e; } return curRows; }
-async function loadDocs() {
-  svDocs = await AW.listAll(C.databaseId, C.surveyCollectionId, 500);
-  ({ entries, dup: dupCnt } = Stats.entriesFromDocs(svDocs));
-}
-async function refreshAll() {
-  $('stInfo').textContent = '불러오는 중...'; $('svInfo').textContent = '불러오는 중...';
-  const errs = [];
-  await Promise.all([
-    loadBase().catch(e => errs.push('기준재고: ' + e.message)),
-    loadCur().catch(e => errs.push('현재재고: ' + e.message)),
-    loadDocs().catch(e => errs.push('입력내역: ' + e.message)),
-    showFileInfo(), showStoresInfo()
+function parseTable(text) { return Stock.parseCSV(String(text).replace(/^﻿/, '')); }
+async function loadData() {
+  $('dataInfo').textContent = '판매점·재고 목록 불러오는 중...';
+  const msgs = [];
+  try {
+    const t = parseTable(await AW.fileText(C.publicBucketId, C.storesFileId));
+    stores = t.slice(1).map(r => ({ code: String(r[0] || '').trim(), name: String(r[1] || '').trim() })).filter(s => s.code || s.name);
+    msgs.push(`판매점 ${stores.length.toLocaleString()}곳`);
+  } catch (e) { msgs.push('판매점 목록 없음'); }
+  // 기준재고 + 현재재고 (현재재고는 판매/이관 비교용으로만 사용)
+  const [b, c] = await Promise.all([
+    AW.fileText(C.publicBucketId, C.basePubFileId).then(t => Stock.toStockRows(parseTable(t))).catch(() => null),
+    AW.fileText(C.publicBucketId, C.curPubFileId).then(t => Stock.toStockRows(parseTable(t))).catch(() => null)
   ]);
-  renderSurveys(); renderStats();
-  if (errs.length) $('stInfo').innerHTML += `<br><span class="bad">${esc(errs.join(' / '))}</span>`;
+  baseRows = b; curRows = c;
+  // 모델명 찾기는 기준재고+현재재고 합쳐서 (입력·저장은 됨). 통계는 기준재고에 있는 단말만 집계
+  const union = [...new Map([...(b || []), ...(c || [])].map(r => [Stats.key(r.model, r.serial), r])).values()];
+  stockIdx = union.length ? Stock.buildIndex(union) : null;
+  msgs.push(b ? `기준재고 ${b.length.toLocaleString()}건` : '기준재고 없음');
+  if (c) msgs.push(`현재재고 ${c.length.toLocaleString()}건`);
+  $('dataInfo').textContent = msgs.join(' · ');
+  showRecentPick();
+  relabel();
 }
+$('btnReload').onclick = loadData;
 
-// ================= 기준재고 / 현재재고 업로드 =================
-async function showFileInfo() {
-  for (const [el, bucket, id, label] of [['curBase', C.bucketId, C.baseFileId, '기준재고'], ['curCur', C.publicBucketId, C.curPubFileId, '현재재고']]) {
-    try {
-      const m = await AW.fileMeta(bucket, id);
-      $(el).innerHTML = `등록됨 · ${fmt(m.$updatedAt)}`; $(el).dataset.at = m.$updatedAt;
-    } catch (e) { $(el).innerHTML = e.code === 404 ? `<span class="warn">등록된 ${label} 없음</span>` : `<span class="bad">오류: ${esc(e.message)}</span>`; }
+// ================= P코드 자동완성 =================
+const inp = $('pcode'), sugg = $('sugg');
+let suggList = [], suggOn = 0;
+function showSugg() {
+  const q = inp.value.trim().toUpperCase();
+  if (q.length < 2) { sugg.classList.add('hidden'); return; }
+  const starts = [], contains = [];
+  for (const s of stores) {
+    const c = s.code.toUpperCase(), n = s.name.toUpperCase();
+    if (c.startsWith(q) || n.startsWith(q)) starts.push(s);
+    else if (c.includes(q) || n.includes(q)) contains.push(s);
+    if (starts.length >= 30) break;
   }
+  suggList = starts.concat(contains).slice(0, 30); suggOn = 0;
+  sugg.innerHTML = suggList.length
+    ? suggList.map((s, i) => `<div data-i="${i}" class="${i === 0 ? 'on' : ''}"><b>${esc(s.code)}</b><span>${esc(s.name)}</span></div>`).join('')
+    : `<div class="none">${stores.length ? '일치하는 판매점이 없습니다' : '판매점 목록이 아직 등록되지 않았습니다'}</div>`;
+  sugg.classList.remove('hidden');
 }
-function previewRows(rows, statsEl, regsEl) {
-  const keys = new Map(); rows.forEach(r => { const k = Stats.key(r.model, r.serial); keys.set(k, (keys.get(k) || 0) + 1); });
-  const dups = [...keys.values()].filter(v => v > 1).length;
-  const byReg = new Map(), etc = new Map();
-  rows.forEach(r => { const g = Stats.regionOf(r.group); byReg.set(g, (byReg.get(g) || 0) + 1); if (g === '기타') etc.set(r.group || '(빈칸)', (etc.get(r.group || '(빈칸)') || 0) + 1); });
-  $(statsEl).innerHTML = `<div><b>${rows.length.toLocaleString()}</b>재고 건수</div><div><b>${new Set(rows.map(r => r.model)).size}</b>모델 종류</div><div><b>${new Set(rows.map(r => r.group)).size}</b>POS그룹</div><div><b>${new Set(rows.map(r => Stats.storeId(r))).size}</b>판매점</div><div><b class="${dups ? 'warn' : ''}">${dups}</b>중복(모델+일련번호)</div>`;
-  $(regsEl).innerHTML = '지역별: ' + Stats.REGIONS.filter(g => byReg.has(g)).map(g => `${g} ${byReg.get(g).toLocaleString()}`).join(' · ') +
-    (etc.size ? `<br>기타로 분류되는 POS그룹명: ${[...etc].map(([g, c]) => `${esc(g)}(${c})`).join(', ')}` : '') +
-    (rows.some(r => !r.group) ? '<br><span class="warn">POS그룹명이 비어 있는 행이 있습니다 — 재고 엑셀 양식인지 확인하세요</span>' : '');
-}
-function makeUploader(kind) {
-  const P = kind === 'base' ? { drop: 'dropBase', file: 'fileBase', prev: 'basePreview', st: 'baseStats', rg: 'baseRegs', btn: 'btnUpBase', msg: 'baseMsg', label: '기준재고' }
-                            : { drop: 'dropCur', file: 'fileCur', prev: 'curPreview', st: 'curStats', rg: 'curRegs', btn: 'btnUpCur', msg: 'curMsg', label: '현재재고' };
-  let parsed = null;
-  bindDrop(P.drop, P.file, async file => {
-    $(P.msg).textContent = ''; $(P.prev).classList.add('hidden');
-    try {
-      parsed = Stock.toStockRows(await readTable(file));
-      if (!parsed.length) throw new Error('데이터 행이 없습니다');
-      previewRows(parsed, P.st, P.rg);
-      $(P.prev).classList.remove('hidden');
-    } catch (e) { parsed = null; $(P.msg).innerHTML = `<span class="bad">파일 오류: ${esc(e.message)}</span>`; }
-  });
-  $(P.btn).onclick = async () => {
-    if (!parsed) return;
-    $(P.btn).disabled = true; $(P.msg).textContent = '업로드 중...';
-    try {
-      const pub = new Blob([Stock.toCSV(parsed, false)], { type: 'text/csv' });
-      if (kind === 'base') {
-        await AW.replaceFile(C.bucketId, C.baseFileId, new Blob([Stock.toCSV(parsed, true)], { type: 'text/csv' }), 'base.csv');   // 출고가 포함 (비공개)
-        await AW.replaceFile(C.publicBucketId, C.basePubFileId, pub, 'base_pub.csv');                                               // 조사 화면용 (공개)
-      } else {
-        await AW.replaceFile(C.publicBucketId, C.curPubFileId, pub, 'current_pub.csv');
-      }
-      $(P.msg).innerHTML = `<span class="ok">${P.label} 등록 완료: ${parsed.length.toLocaleString()}건</span>`;
-      $(P.prev).classList.add('hidden'); parsed = null;
-      refreshAll();
-    } catch (e) {
-      $(P.msg).innerHTML = `<span class="bad">업로드 실패: ${esc(e.message)}</span>` + (e.code === 401 ? '<br>버킷 쓰기 권한을 확인하세요.' : e.code === 404 ? '<br>버킷이 없습니다 (stocklist / public 버킷 확인).' : '');
-    } finally { $(P.btn).disabled = false; }
-  };
-}
-makeUploader('base'); makeUploader('cur');
-
-// ================= 판매점 목록 =================
-let storesParsed = null;
-async function showStoresInfo() {
-  try {
-    const m = await AW.fileMeta(C.publicBucketId, C.storesFileId);
-    const n = Stock.parseCSV(await AW.fileText(C.publicBucketId, C.storesFileId)).length - 1;
-    $('curStores').innerHTML = `현재 등록: <b>${n.toLocaleString()}곳</b> · ${fmt(m.$updatedAt)}`;
-  } catch (e) { $('curStores').innerHTML = e.code === 404 ? '<span class="warn">등록된 판매점 목록 없음</span>' : `<span class="bad">오류: ${esc(e.message)}</span>`; }
-}
-bindDrop('dropStores', 'fileStores', async file => {
-  $('storesMsg').textContent = ''; $('storesPreview').classList.add('hidden');
-  try {
-    const t = await readTable(file);
-    const hi = t.findIndex(r => r.some(v => /POS\s*코드|P\s*코드|pos_code/i.test(v)) && r.some(v => /판매점명|store_name/i.test(v)));
-    if (hi < 0) throw new Error('헤더에 "POS코드"(또는 P코드)와 "판매점명" 컬럼이 필요합니다');
-    const h = t[hi].map(v => String(v).trim());
-    const iC = h.findIndex(v => /POS\s*코드|P\s*코드|pos_code/i.test(v));
-    const iN = h.findIndex(v => /판매점명|store_name/i.test(v));
-    const iR = h.findIndex(v => /비고|remarks/i.test(v));
-    const map = new Map(); let ended = 0, noCode = 0;
-    for (const r of t.slice(hi + 1)) {
-      const code = String(r[iC] ?? '').trim(), name = String(r[iN] ?? '').trim();
-      if (!name) continue;
-      if (iR >= 0 && /\[end\]/i.test(String(r[iR] ?? ''))) { ended++; continue; }   // 종료 판매점 제외
-      if (!code) noCode++;
-      map.set(code || name, { code, name });
-    }
-    storesParsed = [...map.values()].sort((a, b) => a.code.localeCompare(b.code));
-    if (!storesParsed.length) throw new Error('판매점 데이터가 없습니다');
-    $('storesStats').innerHTML = `<div><b>${storesParsed.length.toLocaleString()}</b>등록할 판매점</div><div><b>${ended}</b>[end] 종료점 제외</div><div><b class="${noCode ? 'warn' : ''}">${noCode}</b>P코드 없음</div>`;
-    $('storesTbl').innerHTML = '<tr><th>P코드</th><th>판매점명</th></tr>' + storesParsed.slice(0, 5).map(s => `<tr><td class="mono">${esc(s.code)}</td><td>${esc(s.name)}</td></tr>`).join('');
-    $('storesPreview').classList.remove('hidden');
-  } catch (e) { storesParsed = null; $('storesMsg').innerHTML = `<span class="bad">파일 오류: ${esc(e.message)}</span>`; }
+inp.addEventListener('input', showSugg);
+inp.addEventListener('focus', showSugg);
+inp.addEventListener('keydown', e => {
+  if (sugg.classList.contains('hidden') || !suggList.length) return;
+  if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+    e.preventDefault();
+    suggOn = (suggOn + (e.key === 'ArrowDown' ? 1 : -1) + suggList.length) % suggList.length;
+    sugg.querySelectorAll('div').forEach((d, i) => d.classList.toggle('on', i === suggOn));
+  } else if (e.key === 'Enter') { e.preventDefault(); pick(suggList[suggOn]); }
 });
-$('btnUpStores').onclick = async () => {
-  if (!storesParsed) return;
-  $('btnUpStores').disabled = true; $('storesMsg').textContent = '업로드 중...';
+sugg.addEventListener('mousedown', e => { const d = e.target.closest('div[data-i]'); if (d) { e.preventDefault(); pick(suggList[+d.dataset.i]); } });
+document.addEventListener('click', e => { if (!e.target.closest('.ac')) sugg.classList.add('hidden'); });
+// ================= 진입 / 전환 =================
+function setChip(kind) {
+  $('chipStore').classList.toggle('on', kind === 'store');
+  $('chipStaff').classList.toggle('on', kind === 'staff');
+  $('boxStore').classList.toggle('hidden', kind !== 'store');
+  $('boxStaff').classList.toggle('hidden', kind !== 'staff');
+  setTimeout(() => (kind === 'store' ? inp : $('staffName')).focus(), 50);
+}
+$('chipStore').onclick = () => setChip('store');
+$('chipStaff').onclick = () => setChip('staff');
+
+function enter(p) {   // p = {kind:'store'|'staff', code, name}
+  picked = p;
+  try { localStorage.setItem('survey_pick', JSON.stringify(p)); } catch (e) {}
+  $('whoKind').textContent = p.kind === 'staff' ? '영업사원' : '판매점';
+  $('whoKind').classList.toggle('staff', p.kind === 'staff');
+  $('whoName').textContent = p.name;
+  $('whoCode').textContent = p.kind === 'staff' ? '' : p.code;
+  inp.value = ''; sugg.classList.add('hidden');
+  $('entryView').classList.add('hidden'); $('scanView').classList.remove('hidden');
+  setStatus(''); scrollTo(0, 0); updateSend();
+}
+function pick(s) { if (s) enter({ kind: 'store', code: s.code, name: s.name }); }
+function staffGo() {
+  const n = $('staffName').value.trim();
+  if (n.length < 2) { toast('영업사원 이름을 2자 이상 입력하세요'); $('staffName').focus(); return; }
+  enter({ kind: 'staff', code: '영업사원', name: n });
+}
+$('btnStaffGo').onclick = staffGo;
+$('staffName').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); staffGo(); } });
+
+function showRecentPick() {   // 최근 조사자 바로 이어하기
+  let p = null; try { p = JSON.parse(localStorage.getItem('survey_pick') || 'null'); } catch (e) {}
+  const el = $('recentPick');
+  if (!p || !p.name) { el.classList.add('hidden'); return; }
+  el.innerHTML = `최근: ${p.kind === 'staff' ? '영업사원 ' : esc(p.code) + ' '}${esc(p.name)} · <a id="btnResume">이어서 하기</a>` +
+                 (list.length ? ` <span style="color:var(--warn)">(미전송 ${list.length}건)</span>` : '');
+  el.classList.remove('hidden');
+  $('btnResume').onclick = () => enter(p.kind ? p : { kind: 'store', ...p });
+}
+// ================= 조사현황 =================
+async function openStats() {
+  if (camWanted) $('btnCam').click();             // 카메라 끄기
+  $('statView').classList.remove('hidden'); scrollTo(0, 0);
+  $('stTitle').textContent = picked.kind === 'staff' ? `${picked.name} 조사현황` : `${picked.name} 조사현황`;
+  $('stBody').textContent = '불러오는 중...'; $('stSum').innerHTML = '';
   try {
-    const csv = '﻿P코드,판매점명\n' + storesParsed.map(s => [s.code, s.name].map(csvEsc).join(',')).join('\n');
-    await AW.replaceFile(C.publicBucketId, C.storesFileId, new Blob([csv], { type: 'text/csv' }), 'stores.csv');
-    $('storesMsg').innerHTML = `<span class="ok">등록 완료: ${storesParsed.length.toLocaleString()}곳</span>`;
-    $('storesPreview').classList.add('hidden'); storesParsed = null;
-    showStoresInfo();
-  } catch (e) { $('storesMsg').innerHTML = `<span class="bad">업로드 실패: ${esc(e.message)}</span>`; }
-  finally { $('btnUpStores').disabled = false; }
-};
-
-// ================= 입력완료 내역 =================
-function renderSurveys() {
-  // 기준재고+현재재고로 모델명 다시 매칭 (리스트를 나중에 올리거나 바꿔도 반영)
-  const union = [...new Map([...(baseRows || []), ...(curRows || [])].map(r => [Stats.key(r.model, r.serial), r])).values()];
-  const idx = union.length ? Stock.buildIndex(union) : null;   // 모델명은 기준+현재재고에서 찾음 (통계는 기준재고만)
-  for (const e of entries) {
-    if (!idx) continue;
-    const m = idx.find([e.serialRaw, e.serial]);
-    if (m.rows.length) {
-      const ms = [...new Set(m.rows.map(r => r.model))];
-      e.model = ms.includes(e.model) ? e.model : ms.join(' / ');   // 조사 때 고른 모델 유지
-      e.gone = false; e.matched = true;
-    } else { e.gone = e.matched; e.matched = false; }
-  }
-  const stores = new Set(entries.map(e => e.store));
-  $('svInfo').textContent = `${svDocs.length}회 전송`;
-  $('svStats').innerHTML = `<div><b>${entries.length.toLocaleString()}</b>입력 단말</div><div><b>${stores.size}</b>입력자</div><div><b class="${entries.some(e => !e.matched) ? 'warn' : ''}">${entries.filter(e => !e.matched).length}</b>재고 미등록</div><div><b>${dupCnt}</b>중복 입력 (이전 입력 제외됨)</div>`;
-  const MAX = 500;
-  $('svBody').innerHTML = entries.length
-    ? entries.slice(0, MAX).map((e, i) => `<tr><td class="n">${i + 1}</td><td>${esc(e.store)}</td><td${e.matched ? '' : ' class="warn"'}>${esc(modelLabel(e))}</td><td class="mono">${esc(e.serial)}</td></tr>`).join('')
-      + (entries.length > MAX ? `<tr><td colspan="4" style="color:var(--sub)">… 최근 ${MAX}건만 표시 (전체는 [입력건 다운로드])</td></tr>` : '')
-    : '<tr><td colspan="4" style="color:var(--sub)">입력된 내역이 없습니다</td></tr>';
-}
-$('btnSvReload').onclick = refreshAll;
-const modelLabel = e => e.matched ? e.model : (e.gone && e.model ? `${e.model} (재고리스트에 없음)` : '재고 미등록');
-
-// ================= 통계 =================
-function renderStats() {
-  const bAt = $('curBase').dataset.at, cAt = $('curCur').dataset.at;
-  if (!baseRows) {
-    $('stInfo').innerHTML = '<span class="warn">기준재고가 없습니다.</span> [관리] 탭에서 ① 기준재고를 먼저 업로드하세요.';
-    $('stView').innerHTML = ''; statRes = null; renderReport(); return;
-  }
-  statRes = Stats.compute(baseRows, curRows, entries);
-  $('stInfo').innerHTML = `기준재고 <b>${baseRows.length.toLocaleString()}건</b>${bAt ? ' (' + fmt(bAt) + ')' : ''} · ` +
-    (curRows ? `현재재고 <b>${curRows.length.toLocaleString()}건</b>${cAt ? ' (' + fmt(cAt) + ')' : ''}` : '<span class="warn">현재재고 미등록</span>') +
-    ` · 조사 입력 <b>${entries.length.toLocaleString()}건</b> (기준재고 매칭 ${statRes.surveyedCount.toLocaleString()}건)`;
-  Stats.mount($('stView'), statRes);
-  renderReport();
-}
-$('btnStReload').onclick = refreshAll;
-
-function saveXlsx(rows, header, name, sheets) {
-  const wb = XLSX.utils.book_new();
-  for (const [sn, hd, rs] of (sheets || [['재고조사', header, rows]])) {
-    const ws = XLSX.utils.aoa_to_sheet([hd, ...rs]);
-    ws['!cols'] = hd.map(h => ({ wch: /모델|판매점|닉네임|입력판매점/.test(h) ? 26 : 13 }));
-    XLSX.utils.book_append_sheet(wb, ws, sn);
-  }
-  const blob = new Blob([XLSX.write(wb, { bookType: 'xlsx', type: 'array' })],
-                        { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob); a.download = name;
-  document.body.appendChild(a); a.click(); a.remove();
-  setTimeout(() => URL.revokeObjectURL(a.href), 10000);
-}
-
-// 입력건 다운로드: 입력된 리스트만
-$('btnDlInput').onclick = () => {
-  if (!entries.length) return alert('입력된 내역이 없습니다');
-  saveXlsx(entries.map(e => [e.store, modelLabel(e), e.serial]),
-           ['판매점명', '모델명', '일련번호'], `재고조사_입력건_${today()}.xlsx`);
-};
-
-// 전체 다운로드: 기준재고 기준 + 조사완료여부 + 입력판매점 + 상태
-const STATUS_LABEL = { done: '입력완료', sold: '개통완료', todo: '미완료' };
-async function downloadAll(msgEl) {
-  if (!baseRows) return alert('기준재고를 먼저 업로드하세요');
-  const res = statRes || Stats.compute(baseRows, curRows, entries);
-  const out = res.items.map(it => [it.b.model, it.b.serial, it.b.price || 0, it.status === 'done' ? 'Y' : 'N', it.sv ? it.sv.store : '',
-    STATUS_LABEL[it.status], it.moved ? 'Y' : '', Stats.regionOf(it.b.group), it.b.group, it.b.nick, it.c ? it.c.nick : (res.hasCur ? '(현재재고 없음)' : ''),
-    Stats.regionOf(it.owner.group), it.owner.group, it.owner.nick]);
-  saveXlsx(out, ['모델명', '일련번호', '출고가', '조사완료여부', '입력판매점', '상태', '이관여부', '지역', 'POS그룹명', 'POS닉네임', '현재 POS닉네임', '집계 지역', '집계 POS그룹명', '집계 POS닉네임'], `재고조사_전체_${today()}.xlsx`);
-  const c = {}; res.items.forEach(i => c[i.status] = (c[i.status] || 0) + 1);
-  if (msgEl) $(msgEl).innerHTML = `<span class="ok">전체 ${res.items.length.toLocaleString()}건 · 입력완료 ${(c.done || 0).toLocaleString()} · 개통완료 ${(c.sold || 0).toLocaleString()} · 이관 ${res.items.filter(i => i.moved).length.toLocaleString()} · 미완료 ${(c.todo || 0).toLocaleString()}</span>`;
-}
-$('btnDlAll').onclick = () => downloadAll('svMsg');
-$('btnDlAll2').onclick = () => downloadAll(null);
-
-// 통계 다운로드: 지역별 / POS그룹별 / 판매점별 시트
-$('btnDlStats').onclick = () => {
-  if (!statRes) return alert('기준재고를 먼저 업로드하세요');
-  const hd = ['기준재고', '이관출고', '이관입고', '조정재고', '입력완료', '개통완료', '조사완료합계', '미완료', '진행율'];
-  const line = a => [a.base0, a.out, a.in, a.base, a.done, a.sold, a.done + a.sold, a.todo, a.base ? Math.round((a.done + a.sold) / a.base * 1000) / 10 + '%' : '-'];
-  const reg = Stats.aggregate(statRes, 'region').map;
-  const grp = Stats.aggregate(statRes, 'group');
-  const sto = Stats.aggregate(statRes, 'store');
-  const storeInfo = new Map(); for (const it of statRes.items) { storeInfo.set(Stats.storeId(it.b), it.b); if (!storeInfo.has(Stats.storeId(it.owner))) storeInfo.set(Stats.storeId(it.owner), it.owner); }
-  saveXlsx(null, null, `재고조사_통계_${today()}.xlsx`, [
-    ['지역별', ['지역', ...hd], Stats.REGIONS.filter(r => reg.has(r)).map(r => [r, ...line(reg.get(r))])],
-    ['POS그룹별', ['지역', 'POS그룹명', ...hd], [...grp.map].sort((a, b) => Stats.REGIONS.indexOf(Stats.regionOf(a[0])) - Stats.REGIONS.indexOf(Stats.regionOf(b[0])) || b[1].base - a[1].base).map(([g, a]) => [Stats.regionOf(g), g, ...line(a)])],
-    ['판매점별', ['지역', 'POS그룹명', 'POS코드', 'POS닉네임', ...hd], [...sto.map].map(([sid, a]) => { const r = storeInfo.get(sid) || {}; return [Stats.regionOf(r.group), r.group || '', r.posCode || '', r.nick || sid, ...line(a)]; })
-      .sort((x, y) => Stats.REGIONS.indexOf(x[0]) - Stats.REGIONS.indexOf(y[0]) || String(x[1]).localeCompare(y[1]) || String(x[3]).localeCompare(y[3]))]
-  ]);
-};
-
-// ================= 현황 보고서 =================
-// 컬럼: 기준재고(원래) / 이관출고 / 이관입고 / 조정재고(=기준−출고+입고) / 입력완료 / 개통완료(현재재고에 없음) / 조사완료합계 / 미완료 / 진행율
-const RP_HEAD = ['기준재고', '이관\n출고', '이관\n입고', '조정\n재고', '입력완료', '개통완료', '조사완료\n합계', '미완료', '진행율'];
-const NC = RP_HEAD.length;   // 숫자 컬럼 수 (마지막은 진행율)
-(function initReport() {
-  const d = new Date(), q = Math.floor(d.getMonth() / 3) + 1, p2 = n => String(n).padStart(2, '0');
-  $('rpTitle').value = `${d.getFullYear()}년 ${q}분기 대리점 전체 재고조사 현황`;
-  $('rpDate').value = `${d.getFullYear()}.${p2(d.getMonth() + 1)}.${p2(d.getDate())}`;
-  ['rpTitle', 'rpPeriod', 'rpDate'].forEach(id => $(id).addEventListener('input', renderReport));
-})();
-function reportData() {
-  if (!statRes) return null;
-  const line = a => { const total = a.done + a.sold; return [a.base0, a.out, a.in, a.base, a.done, a.sold, total, a.todo, a.base ? total / a.base : 0]; };
-  const reg = Stats.aggregate(statRes, 'region').map;
-  const grp = Stats.aggregate(statRes, 'group').map;
-  const regions = Stats.REGIONS.filter(r => reg.has(r)).map(r => [r, ...line(reg.get(r))]);
-  const order = new Map(); Stats.REGION_DEF.forEach(([, ms], ri) => ms.forEach((m, mi) => order.set(m, ri * 100 + mi)));
-  const groups = [...grp].map(([g, a]) => [Stats.regionOf(g), g, ...line(a)])
-    .sort((x, y) => Stats.REGIONS.indexOf(x[0]) - Stats.REGIONS.indexOf(y[0]) || (order.get(x[1]) ?? 9999) - (order.get(y[1]) ?? 9999) || y[2] - x[2]);
-  const t = [...reg.values()].reduce((s, a) => { for (const k in s) s[k] += a[k]; return s; }, { base0: 0, out: 0, in: 0, base: 0, done: 0, sold: 0, todo: 0 });
-  return { regions, groups, total: ['대리점 합계', ...line(t)] };
-}
-const fmtN = v => (v || 0).toLocaleString();
-const fmtP = v => (v * 100).toFixed(1) + '%';
-function renderReport() {
-  const D = reportData();
-  if (!D) { $('report').innerHTML = '<div style="padding:40px;text-align:center;color:#666">기준재고를 업로드하면 보고서가 만들어집니다</div>'; return; }
-  const head = first => `<tr>${first.map(h => `<th>${h}</th>`).join('')}${RP_HEAD.map(h => `<th>${h.replace('\n', '<br>')}</th>`).join('')}</tr>`;
-  const cells = (v, redTodo, redPct) => v.slice(0, NC - 1).map((x, i) => `<td class="n${i === NC - 2 && redTodo ? ' red' : ''}${i === 3 ? ' adj' : ''}">${fmtN(x)}</td>`).join('') + `<td class="${redPct ? 'red' : ''}">${fmtP(v[NC - 1])}</td>`;
-  let prev = null;
-  $('report').innerHTML = `<h1>■□ ${esc($('rpTitle').value)} □■</h1><div class="rule"></div>
-    <div class="meta">${$('rpPeriod').value ? '시행일 : ' + esc($('rpPeriod').value) + '<br>' : ''}기준일 : ${esc($('rpDate').value)} 기준</div>
-    <table><colgroup><col style="width:16%"><col span="8"><col style="width:8%"></colgroup>
-      <thead>${head(['그룹'])}</thead><tbody>
-      ${D.regions.map(r => `<tr><td>${esc(r[0])}</td>${cells(r.slice(1), true, false)}</tr>`).join('')}
-      <tr class="tot"><td>${D.total[0]}</td>${cells(D.total.slice(1), true, false)}</tr></tbody></table>
-    <table><colgroup><col style="width:8%"><col style="width:11%"><col span="8"><col style="width:8%"></colgroup>
-      <thead>${head(['그룹', '담당구분'])}</thead><tbody>
-      ${D.groups.map(g => { const sep = prev !== null && prev !== g[0]; prev = g[0];
-        return `<tr class="${sep ? 'sep' : ''}"><td>${esc(g[0])}</td><td style="font-size:${g[1].length > 6 ? 10.5 : 12.5}px">${esc(g[1])}</td>${cells(g.slice(2), false, true)}</tr>`; }).join('')}
-      </tbody></table>
-    <div class="sign"><div class="k">결재</div>${['담당', '대표', '점검', '확인', '확정'].map(h => `<div class="h">${h}</div>`).join('')}${'<div class="b"></div>'.repeat(5)}</div>`;
-}
-const loadScript = src => new Promise((ok, no) => { if (document.querySelector(`script[src="${src}"]`)) return ok(); const t = document.createElement('script'); t.src = src; t.onload = ok; t.onerror = () => no(new Error('라이브러리 로딩 실패: ' + src)); document.head.appendChild(t); });
-const rpName = ext => `${$('rpTitle').value.replace(/[\\/:*?"<>|]/g, '').trim() || '재고조사현황'}_${today()}.${ext}`;
-function saveBlob(blob, name) { const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 10000); }
-async function reportCanvas() {
-  await loadScript('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js');
-  return html2canvas($('report'), { scale: 2, backgroundColor: '#ffffff' });
-}
-$('btnRpPng').onclick = async () => {
-  if (!statRes) return alert('기준재고를 먼저 업로드하세요');
-  $('rpMsg').textContent = '이미지 만드는 중...';
-  try { const c = await reportCanvas(); c.toBlob(b => { saveBlob(b, rpName('png')); $('rpMsg').textContent = ''; }, 'image/png'); }
-  catch (e) { $('rpMsg').innerHTML = `<span class="bad">${esc(e.message)}</span>`; }
-};
-$('btnRpPdf').onclick = async () => {
-  if (!statRes) return alert('기준재고를 먼저 업로드하세요');
-  $('rpMsg').textContent = 'PDF 만드는 중...';
-  try {
-    const c = await reportCanvas();
-    await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js');
-    const pdf = new window.jspdf.jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait' });
-    const M = 5, pageW = 210 - M * 2, pageH = 297 - M * 2;
-    // 결재 양식이라 가능하면 A4 한 장에 맞춤 (너무 길 때만 여러 장으로 나눔)
-    if (c.height / c.width <= (pageH / pageW) * 1.6) {
-      const k = Math.min(pageW / c.width, pageH / c.height), w = c.width * k, h = c.height * k;
-      pdf.addImage(c.toDataURL('image/jpeg', 0.95), 'JPEG', (210 - w) / 2, M, w, h);
-      pdf.save(rpName('pdf')); $('rpMsg').textContent = ''; return;
+    if (!baseRows) await loadData();
+    if (!baseRows) { $('stBody').innerHTML = '<span class="empty">기준재고가 아직 등록되지 않았습니다</span>'; return; }
+    const docs = await AW.listAll(C.databaseId, C.surveyCollectionId, 500);
+    const { entries } = Stats.entriesFromDocs(docs);
+    const res = Stats.compute(baseRows, curRows, entries);
+    const d = new Date(); $('stAt').textContent = `${d.getHours()}:${String(d.getMinutes()).padStart(2, '0')} 기준 · 전송 완료된 입력만 반영`;
+    const box = $('stBody');
+    let mine = null;
+    if (picked.kind === 'staff') {
+      // 접속한 이름 = 재고목록의 POS그룹명 → 소속 지역 통계부터, 본인 POS닉네임별 표를 바로 보여줌
+      const name = picked.name.trim();
+      const hasGroup = baseRows.some(r => r.group === name) || (curRows || []).some(r => r.group === name);
+      if (!hasGroup) { box.innerHTML = `<span class="empty">"${esc(name)}" 이름이 재고목록의 POS그룹명과 일치하지 않습니다.<br>재고목록에 적힌 이름 그대로 입력했는지 확인하세요.</span>`; return; }
+      const region = Stats.regionOf(name);
+      mine = Stats.aggregate(res, 'group', r => r.group === name).map.get(name);
+      Stats.mount(box, res, { path: [{ level: 'all' }, { level: 'region', v: region }, { level: 'group', v: name }], minDepth: 1, highlight: name });
+    } else {
+      // 판매점: 내 P코드의 미완료 목록
+      const sid = picked.code;
+      const nick = (baseRows.find(r => r.posCode === sid) || (curRows || []).find(r => r.posCode === sid) || {}).nick;
+      if (!nick) { box.innerHTML = '<span class="empty">이 판매점(P코드)의 기준재고가 없습니다</span>'; return; }
+      mine = Stats.aggregate(res, 'store', r => Stats.storeId(r) === sid).map.get(sid);
+      Stats.mount(box, res, { path: [{ level: 'all' }, { level: 'store', v: sid, name: nick }], minDepth: 1 });
     }
-    const W = pageW, pxPerMm = c.width / W, slice = Math.floor(pageH * pxPerMm);
-    for (let y = 0, i = 0; y < c.height; y += slice, i++) {
-      const part = document.createElement('canvas'); part.width = c.width; part.height = Math.min(slice, c.height - y);
-      part.getContext('2d').drawImage(c, 0, y, c.width, part.height, 0, 0, c.width, part.height);
-      if (i) pdf.addPage();
-      pdf.addImage(part.toDataURL('image/jpeg', 0.95), 'JPEG', M, M, W, part.height / pxPerMm);
+    if (mine) {
+      const pc = mine.base ? Math.round((mine.done + mine.sold) / mine.base * 100) : 0;
+      $('stSum').innerHTML = `<div><b>${mine.base.toLocaleString()}</b>기준재고${(mine.out || mine.in) ? `<br><span style="font-size:10px">원래 ${mine.base0}${mine.out ? ' −' + mine.out : ''}${mine.in ? ' +' + mine.in : ''}</span>` : ''}</div><div><b style="color:var(--ok)">${mine.done.toLocaleString()}</b>입력완료</div>` +
+        `<div><b style="color:var(--sub)">${mine.sold.toLocaleString()}</b>개통완료</div><div><b style="color:var(--warn)">${mine.todo.toLocaleString()}</b>미완료 · ${pc}%</div>`;
     }
-    pdf.save(rpName('pdf')); $('rpMsg').textContent = '';
-  } catch (e) { $('rpMsg').innerHTML = `<span class="bad">${esc(e.message)}</span>`; }
-};
-$('btnRpXlsx').onclick = async () => {
-  const D = reportData(); if (!D) return alert('기준재고를 먼저 업로드하세요');
-  $('rpMsg').textContent = '엑셀 만드는 중...';
-  try {
-    await loadScript('https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js');
-    const wb = new ExcelJS.Workbook(), ws = wb.addWorksheet('재고조사현황', {
-      pageSetup: { paperSize: 9, orientation: 'portrait', fitToPage: true, fitToWidth: 1, fitToHeight: 1, horizontalCentered: true,
-                   margins: { left: 0.3, right: 0.3, top: 0.4, bottom: 0.4, header: 0.2, footer: 0.2 } } });
-    const LC = 2 + NC;   // 마지막 컬럼 번호
-    ws.columns = [{ width: 9 }, { width: 13 }, ...Array(NC - 1).fill({ width: 9 }), { width: 8 }];
-    const F = 'Malgun Gothic', thin = { style: 'thin', color: { argb: 'FF999999' } }, thick = { style: 'medium', color: { argb: 'FF000000' } };
-    const box = c => c.border = { top: thin, bottom: thin, left: thin, right: thin };
-    const put = (r, c, v, st = {}) => { const cell = ws.getCell(r, c); cell.value = v; cell.font = { name: F, size: 10, ...(st.font || {}) }; cell.alignment = { vertical: 'middle', horizontal: st.h || 'center', wrapText: true }; if (st.fill) cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: st.fill } }; if (st.fmt) cell.numFmt = st.fmt; box(cell); return cell; };
-    const outline = (r1, r2, c1 = 1, c2 = LC) => { for (let r = r1; r <= r2; r++) for (let c = c1; c <= c2; c++) { const b = { ...ws.getCell(r, c).border }; if (r === r1) b.top = thick; if (r === r2) b.bottom = thick; if (c === c1) b.left = thick; if (c === c2) b.right = thick; ws.getCell(r, c).border = b; } };
-    ws.mergeCells(1, 1, 1, LC); const t = ws.getCell('A1'); t.value = `■□ ${$('rpTitle').value} □■`; t.font = { name: F, size: 16, bold: true }; t.alignment = { horizontal: 'center', vertical: 'middle' }; ws.getRow(1).height = 32;
-    for (let c = 1; c <= LC; c++) ws.getCell(1, c).border = { bottom: { style: 'double', color: { argb: 'FF000000' } } };
-    let r = 2;
-    if ($('rpPeriod').value) { ws.mergeCells(r, LC - 4, r, LC); ws.getCell(r, LC - 4).value = '시행일 : ' + $('rpPeriod').value; ws.getCell(r, LC - 4).font = { name: F, size: 10 }; ws.getCell(r, LC - 4).alignment = { horizontal: 'right' }; r++; }
-    ws.mergeCells(r, LC - 4, r, LC); ws.getCell(r, LC - 4).value = `기준일 : ${$('rpDate').value} 기준`; ws.getCell(r, LC - 4).font = { name: F, size: 10 }; ws.getCell(r, LC - 4).alignment = { horizontal: 'right' }; r += 2;
-    const nums = (row, v, redTodo, redPct, st = {}) => {
-      v.slice(0, NC - 1).forEach((x, i) => put(row, 3 + i, x, { ...st, h: 'right', fmt: '#,##0', font: { ...(st.font || {}), ...(i === NC - 2 && redTodo ? { color: { argb: 'FFEE0000' }, bold: true } : {}) } }));
-      put(row, LC, v[NC - 1], { ...st, fmt: '0.0%', font: { ...(st.font || {}), ...(redPct ? { color: { argb: 'FFEE0000' }, bold: true } : {}) } });
-    };
-    const header = (row, first) => {
-      if (first.length === 1) { ws.mergeCells(row, 1, row, 2); put(row, 1, first[0], { fill: 'FFF2F2F2', font: { bold: true } }); }
-      else first.forEach((h, i) => put(row, 1 + i, h, { fill: 'FFF2F2F2', font: { bold: true } }));
-      RP_HEAD.forEach((h, i) => put(row, 3 + i, h, { fill: 'FFF2F2F2', font: { bold: true } }));
-      ws.getRow(row).height = 30;
-    };
-    // 표1: 그룹별
-    const s1 = r; header(r++, ['그룹']);
-    for (const g of D.regions) { ws.mergeCells(r, 1, r, 2); put(r, 1, g[0]); nums(r, g.slice(1), true, false); r++; }
-    ws.mergeCells(r, 1, r, 2); const yl = { fill: 'FFFFF2CC', font: { bold: true } };
-    put(r, 1, D.total[0], yl); nums(r, D.total.slice(1), true, false, yl); outline(s1, r); r += 2;
-    // 표2: 담당구분별
-    const s2 = r; header(r++, ['그룹', '담당구분']); let prev = null;
-    for (const g of D.groups) {
-      put(r, 1, g[0]); put(r, 2, g[1], { font: { size: g[1].length > 6 ? 8 : 10 } }); nums(r, g.slice(2), false, true);
-      if (prev !== null && prev !== g[0]) for (let c = 1; c <= LC; c++) ws.getCell(r, c).border = { ...ws.getCell(r, c).border, top: thick };
-      prev = g[0]; r++;
-    }
-    outline(s2, r - 1); r += 1;
-    // 결재란
-    const S0 = LC - 5;
-    ws.mergeCells(r, S0, r + 1, S0); put(r, S0, '결\n재', { font: { bold: true, size: 13 } });
-    ['담당', '대표', '점검', '확인', '확정'].forEach((h, i) => { put(r, S0 + 1 + i, h, { font: { bold: true, size: 12 } }); put(r + 1, S0 + 1 + i, ''); });
-    ws.getRow(r).height = 26; ws.getRow(r + 1).height = 60; outline(r, r + 1, S0, LC);
-    saveBlob(new Blob([await wb.xlsx.writeBuffer()], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), rpName('xlsx'));
-    $('rpMsg').textContent = '';
-  } catch (e) { $('rpMsg').innerHTML = `<span class="bad">${esc(e.message)}</span>`; }
-};
-
-// ================= 탭 =================
-function setTab(t) {
-  $('tabStats').classList.toggle('on', t === 'stats'); $('tabManage').classList.toggle('on', t === 'manage');
-  $('paneStats').classList.toggle('hidden', t !== 'stats'); $('paneManage').classList.toggle('hidden', t !== 'manage');
-}
-$('tabStats').onclick = () => setTab('stats');
-$('tabManage').onclick = () => setTab('manage');
-
-// ================= 데이터 초기화 =================
-$('btnReset').onclick = async () => {
-  const doSv = $('rsSurvey').checked, doB = $('rsBase').checked, doCu = $('rsCur').checked, doSo = $('rsStores').checked;
-  if (!doSv && !doB && !doCu && !doSo) return alert('초기화할 항목을 선택하세요');
-  const what = [doSv && '입력완료 내역', doB && '기준재고', doCu && '현재재고', doSo && '판매점 목록'].filter(Boolean).join(', ');
-  const typed = prompt(`[${what}]을(를) 모두 삭제합니다. 되돌릴 수 없습니다.\n\n계속하려면 "초기화"를 입력하세요.`);
-  if (typed !== '초기화') { $('resetMsg').innerHTML = '<span class="warn">취소되었습니다</span>'; return; }
-  $('btnReset').disabled = true;
-  const log = []; const say = t => { $('resetMsg').textContent = t; };
-  try {
-    if (doSv) {
-      const docs = await AW.listAll(C.databaseId, C.surveyCollectionId, 500, n => say(`입력 내역 확인 중... ${n}`));
-      let done = 0, fail = 0;
-      for (let i = 0; i < docs.length; i += 5) {           // 5건씩 병렬 삭제
-        await Promise.all(docs.slice(i, i + 5).map(d =>
-          AW.deleteDoc(C.databaseId, C.surveyCollectionId, d.$id).then(() => done++).catch(() => fail++)));
-        say(`입력 내역 삭제 중... ${done + fail}/${docs.length}`);
-      }
-      log.push(`입력 내역 ${done}건 삭제` + (fail ? ` (실패 ${fail}건 — 컬렉션 Delete 권한 확인)` : ''));
-    }
-    const delFile = async (b, id, label) => {
-      try { await AW.deleteFile(b, id); log.push(`${label} 삭제`); }
-      catch (e) { log.push(e.code === 404 ? `${label} 없음` : `${label} 삭제 실패: ${e.message}`); }
-    };
-    if (doB) { await delFile(C.bucketId, C.baseFileId, '기준재고'); await delFile(C.publicBucketId, C.basePubFileId, '기준재고(공개용)'); }
-    if (doCu) await delFile(C.publicBucketId, C.curPubFileId, '현재재고');
-    if (doSo) await delFile(C.publicBucketId, C.storesFileId, '판매점 목록');
-    $('resetMsg').innerHTML = `<span class="ok">초기화 완료</span> · ${esc(log.join(' · '))}`;
   } catch (e) {
-    $('resetMsg').innerHTML = `<span class="bad">초기화 실패: ${esc(e.message)}</span>` + (log.length ? ' · ' + esc(log.join(' · ')) : '');
-  } finally {
-    $('btnReset').disabled = false;
-    refreshAll();
+    $('stBody').innerHTML = `<span class="empty">불러오기 실패: ${esc(e.message)}</span>` + (e.code === 401 ? '<br><span class="empty">surveys 컬렉션 읽기 권한(Any)을 확인하세요</span>' : '');
   }
+}
+$('btnStat').onclick = openStats;
+$('btnStReload').onclick = openStats;
+$('btnStClose').onclick = () => { $('statView').classList.add('hidden'); };
+
+$('btnChange').onclick = () => {
+  if (camWanted) $('btnCam').click();          // 카메라 끄기
+  picked = null; updateSend();
+  $('scanView').classList.add('hidden'); $('entryView').classList.remove('hidden');
+  showRecentPick(); setChip('store');
 };
 
-boot();
+// ================= 인식 결과 목록 =================
+let list = [];   // [{model, serial, serialRaw, matched}]
+try { list = JSON.parse(localStorage.getItem('survey_list') || '[]'); } catch (e) {}
+const saveDraft = () => { try { localStorage.setItem('survey_list', JSON.stringify(list)); } catch (e) {} };
+// 삼성 박스 바코드 = 라벨 인쇄 일련번호 + 검증문자 1자리
+//   인쇄 12자리 → 바코드 13자리 (CTLSM0107718+7, CT7BM1097614+N, CT61M0399510+B)
+//   인쇄 15자리 → 바코드 16자리 (SML345AE1168564+9)
+const samsungBase = t => (t.length === 13 || t.length === 16) ? t.slice(0, -1) : t.replace(/[A-Z]+$/, '');
+// 표시용: 인쇄 일련번호의 끝 숫자 7자리 (CTLSM01077187 → 0107718)
+const serial7 = s => { const m = samsungBase(String(s)).match(/(\d{7})$/); return m ? m[1] : null; };
+
+// 일련번호 → 재고 모델 후보. 같은 일련번호가 여러 모델에 있으면 바코드 원본에 든 모델코드로 먼저 좁힘
+//   예) 원본 SML345AK11616199 + 후보 [SM-L345N, SM-A176L] → "L345"가 들어 있는 SM-L345N 자동 선택
+function lookupModel(cands, raw = '') {
+  if (!stockIdx) return { model: '', matched: false, options: [] };
+  const m = stockIdx.find(cands);
+  let models = [...new Set(m.rows.map(r => r.model))];
+  if (models.length > 1 && raw) {
+    const R = raw.toUpperCase().replace(/[^A-Z0-9]/g, '');
+    const hit = models.filter(md => { const c = md.toUpperCase().match(/SM-?([A-Z]\d{3})/); return c && R.includes(c[1]); });
+    if (hit.length >= 1) models = hit;
+  }
+  if (!models.length) return { model: '', matched: false, options: [] };
+  return { model: models[0], matched: true, options: models };
+}
+// 바코드 묶음에서 일련번호만 추출
+function serialsFrom(results) {
+  const out = [];
+  for (const b of results) {
+    if (!b.isValid || !b.text) continue;
+    const t = b.text.trim();
+    const ap = t.match(/boxinfo\.apple\.com\/.*?\/21\/([A-Z0-9]+)/i);              // 아이폰 박스 QR
+    if (ap) { out.push({ serial: ap[1].toUpperCase(), raw: ap[1].toUpperCase(), cands: [ap[1]] }); continue; }
+    if (/^\d+$/.test(t) || /^89\d{30}$/.test(t)) continue;                          // IMEI·EID·EAN 제외
+    if (/^S[A-Z0-9]{10}$|^S[A-Z0-9]{12}$/.test(t) && /[A-Z]/.test(t.slice(1))) {     // 아이폰 시리얼 바코드 (S+시리얼)
+      out.push({ serial: t.slice(1), raw: t.slice(1), cands: [t.slice(1), t] }); continue;
+    }
+    // 스타일폴더(AT-M140L 등): ATM + 숫자 (예: ATM71301561626) → 뒤 6자리 561626
+    const a6 = t.match(/^ATM\d{8,12}$/);
+    if (a6) { const v = t.slice(-6); out.push({ serial: v, raw: t, cands: [v] }); continue; }
+    // 삼성 박스 2D코드(DataMatrix): 영문 3자리 + 일련번호 숫자 7자리 + 검증문자 1자리
+    // 예) AXP03995109 → 0399510, AYC0107718. → 0107718
+    const dm = t.match(/^[A-Z]{3}(\d{7})[0-9A-Z.]?$/);
+    if (dm) { out.push({ serial: dm[1], raw: t, cands: [dm[1]] }); continue; }
+    if (/^[A-Z0-9]{10,16}$/.test(t) && /[A-Z]/.test(t) && /\d/.test(t)) {            // 삼성 등
+      const s7 = serial7(t);
+      out.push({ serial: s7 || t, raw: t, cands: [t, samsungBase(t), s7].filter(Boolean) });
+    }
+  }
+  return out;
+}
+// 같은 박스가 계속 비칠 때 연속 경고가 뜨지 않도록: 방금 추가한 일련번호는 2.5초간 경고 제외, 경고는 같은 번호당 2초에 1번
+const recentAdd = new Map(), recentWarn = new Map();
+let dupTimer = null;
+function showDup(x) {
+  const el = $('dupMsg');
+  el.textContent = `이미 입력된 재고입니다 · ${x.matched ? x.model : '재고 미등록'} ${x.serial}`;
+  el.classList.remove('off');
+  clearTimeout(dupTimer); dupTimer = setTimeout(() => el.classList.add('off'), 2500);
+  const row = document.querySelector(`#list .it[data-s="${CSS.escape(x.serial)}"]`);
+  if (row) { row.classList.remove('dup'); void row.offsetWidth; row.classList.add('dup'); }
+  haptic(true); beep(600);
+}
+// ---- 모델 선택창 (같은 일련번호가 여러 모델에 있을 때) ----
+const pending = [];   // [{serial, raw, options}]
+function openChooser() {
+  if (!pending.length || !$('chooser').classList.contains('hidden')) return;
+  const p = pending[0];
+  $('chSerial').textContent = `일련번호 ${p.serial}  (원본 ${p.raw})`;
+  $('chOpts').innerHTML = p.options.map((m, i) => `<button data-i="${i}">${esc(m)}</button>`).join('');
+  $('chOpts').querySelectorAll('button').forEach(b => b.onclick = () => closeChooser(p.options[+b.dataset.i]));
+  $('chooser').classList.remove('hidden');
+  haptic(true); beep(1000);
+}
+function closeChooser(model) {
+  const p = pending.shift();
+  $('chooser').classList.add('hidden');
+  if (model && p && !list.some(x => x.serial === p.serial)) {
+    list.push({ model, serial: p.serial, serialRaw: p.raw, matched: true, _new: true });
+    recentAdd.set(p.serial, Date.now());
+    haptic(); beep(); saveDraft(); renderList();
+  } else if (p) recentAdd.set(p.serial, Date.now());   // 취소한 박스가 바로 다시 뜨지 않게
+  if (pending.length) setTimeout(openChooser, 150);
+}
+$('chCancel').onclick = () => closeChooser(null);
+
+function addSerials(found) {
+  if (!$('chooser').classList.contains('hidden')) return 0;   // 선택창이 떠 있는 동안은 인식 멈춤
+  let added = 0; const now = Date.now();
+  for (const f of found) {
+    const ex = list.find(x => x.serial === f.serial);
+    if (ex) {
+      if (now - (recentAdd.get(f.serial) || 0) < 2500) continue;     // 방금 찍은 박스
+      if (now - (recentWarn.get(f.serial) || 0) < 2000) continue;    // 경고 반복 방지
+      recentWarn.set(f.serial, now); showDup(ex);
+      continue;
+    }
+    if (pending.some(p => p.serial === f.serial)) continue;          // 이미 선택 대기 중
+    if (now - (recentAdd.get(f.serial) || 0) < 2500) continue;       // 방금 취소한 박스
+    const r = lookupModel(f.cands, f.raw);
+    if (r.options.length > 1) { pending.push({ serial: f.serial, raw: f.raw, options: r.options }); openChooser(); continue; }
+    list.push({ model: r.model, serial: f.serial, serialRaw: f.raw, matched: r.matched, _new: true });
+    recentAdd.set(f.serial, now);
+    added++;
+  }
+  if (added) {
+    $('box').classList.add('hit'); setTimeout(() => $('box').classList.remove('hit'), 250);
+    haptic(); beep();
+    $('dupMsg').classList.add('off');
+    saveDraft(); renderList();
+  }
+  return added;
+}
+function renderList() {
+  const el = $('list');
+  if (!list.length) el.innerHTML = '<div class="empty">바코드를 비추면 모델명·일련번호가 한 줄씩 쌓입니다</div>';
+  else el.innerHTML = list.map((x, i) => `<div class="it${x._new ? ' new' : ''}" data-s="${esc(x.serial)}"><span class="n">${i + 1}</span>
+      <span class="m${x.matched ? '' : ' no'}">${x.matched ? esc(x.model) : '재고 미등록'}</span>
+      <span class="s">${esc(x.serial)}${x.serialRaw && x.serialRaw !== x.serial ? `<small>${esc(x.serialRaw)}</small>` : ''}</span><button class="x" data-i="${i}" aria-label="삭제">×</button></div>`).reverse().join('');
+  list.forEach(x => delete x._new);
+  el.querySelectorAll('.x').forEach(b => b.onclick = () => { list.splice(+b.dataset.i, 1); saveDraft(); renderList(); });
+  $('listCnt').textContent = list.length + '건';
+  updateSend();
+}
+function relabel() {   // 재고리스트가 늦게 로드된 경우 모델명 다시 채움
+  let ch = false;
+  for (const x of list) if (!x.matched) { const r = lookupModel([x.serialRaw, x.serial], x.serialRaw); if (r.options.length === 1) { x.model = r.model; x.matched = true; ch = true; } }
+  if (ch) saveDraft(); renderList();
+}
+function updateSend() { $('btnSend').disabled = !(picked && list.length); }
+
+// ---- 진동: 안드로이드는 Vibration API, 아이폰(Safari는 미지원)은 iOS 18+ 스위치 햅틱으로 대체 ----
+const iosHaptic = (() => {
+  if ('vibrate' in navigator) return null;
+  const l = document.createElement('label'), i = document.createElement('input');
+  i.type = 'checkbox'; i.setAttribute('switch', '');
+  l.appendChild(i); l.style.cssText = 'position:fixed;left:-999px;top:0;opacity:0;pointer-events:none';
+  document.body.appendChild(l); return l;
+})();
+function haptic(double = false) {
+  if ('vibrate' in navigator) { navigator.vibrate(double ? [40, 60, 40] : 70); return; }
+  try { iosHaptic.click(); if (double) setTimeout(() => iosHaptic.click(), 140); } catch (e) {}
+}
+// 아이폰은 사용자가 화면을 한 번 눌러야 소리가 나므로 첫 터치 때 오디오를 깨워둠
+function unlockAudio() {
+  try { actx = actx || new (window.AudioContext || window.webkitAudioContext)(); if (actx.state === 'suspended') actx.resume(); } catch (e) {}
+}
+addEventListener('touchend', unlockAudio, { passive: true }); addEventListener('click', unlockAudio);
+let actx;
+function beep(f = 1800) {
+  try { actx = actx || new (window.AudioContext || window.webkitAudioContext)();
+    const o = actx.createOscillator(), g = actx.createGain(); o.frequency.value = f; g.gain.value = 0.08;
+    o.connect(g); g.connect(actx.destination); o.start(); o.stop(actx.currentTime + 0.08); } catch (e) {}
+}
+
+// ================= 바코드 엔진 =================
+const ZX = 'https://cdn.jsdelivr.net/npm/zxing-wasm@2.2.4/dist';
+let readBarcodes = null;
+const libReady = import(ZX + '/es/reader/index.js').then(m => {
+  m.prepareZXingModule({ overrides: { locateFile: (p, prefix) => p.endsWith('.wasm') ? ZX + '/reader/' + p : prefix + p }, fireImmediately: true });
+  readBarcodes = m.readBarcodes; return true;
+}).catch(e => { setStatus('바코드 엔진 로딩 실패: ' + e.message); return false; });
+const READ_OPTS = { tryHarder: true, tryInvert: true, tryRotate: true, maxNumberOfSymbols: 20, formats: ['Code128', 'Code39', 'QRCode', 'DataMatrix'] };
+
+// ================= 카메라 =================
+const video = $('video'), box = $('box');
+const canvas = document.createElement('canvas');
+const ctx = canvas.getContext('2d', { willReadFrequently: true });
+let stream = null, track = null, scanning = false, camToken = 0, camWanted = false;
+const camMsg = t => { $('camMsg').textContent = t || ''; $('camMsg').classList.toggle('hidden', !t); };
+
+async function startCam() {
+  stopCam(false);
+  const my = ++camToken;
+  if (!navigator.mediaDevices?.getUserMedia) { camMsg('이 브라우저는 카메라를 지원하지 않습니다.\n(카카오톡 내장 브라우저라면 크롬/삼성인터넷으로 여세요)'); return; }
+  camMsg('카메라 켜는 중...');
+  const tries = [
+    { audio: false, video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } } },
+    { audio: false, video: { facingMode: 'environment' } },
+    { audio: false, video: true }
+  ];
+  let s = null, lastErr = null;
+  for (const c of tries) {
+    try { s = await navigator.mediaDevices.getUserMedia(c); break; }
+    catch (e) { lastErr = e; if (e.name === 'NotAllowedError' || e.name === 'SecurityError') break; await sleep(400); }
+  }
+  if (my !== camToken) { s?.getTracks().forEach(t => t.stop()); return; }
+  if (!s) {
+    const n = lastErr?.name;
+    camMsg(n === 'NotAllowedError' ? '카메라 권한이 차단되어 있습니다.\n주소창 왼쪽 아이콘 → 권한 → 카메라 허용 후\n[카메라]를 다시 누르세요.'
+         : n === 'NotReadableError' ? '다른 앱이 카메라를 사용 중입니다.\n다른 앱을 닫고 [카메라]를 다시 누르세요.'
+         : '카메라를 열 수 없습니다: ' + (n || lastErr?.message));
+    camWanted = false; $('btnCam').classList.remove('cam-on'); $('btnCam').textContent = '카메라';
+    return;
+  }
+  stream = s; track = s.getVideoTracks()[0];
+  track.addEventListener('ended', () => { if (my === camToken) { stopCam(false); camMsg('카메라가 중지되었습니다.\n[카메라]를 다시 누르세요.'); } });
+  video.srcObject = s;
+  try { await video.play(); } catch (e) {}
+  camMsg('');
+  try { await track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] }); } catch (e) {}
+  scanning = true; loop(my);
+}
+function stopCam(userAction = true) {
+  camToken++; scanning = false;
+  if (stream) stream.getTracks().forEach(t => t.stop());
+  stream = null; track = null;
+  try { video.pause(); } catch (e) {}
+  video.srcObject = null;
+  if (userAction) { camMsg('[카메라]를 누르면 스캔을 시작합니다'); setStatus(''); }
+}
+$('btnCam').onclick = () => {
+  camWanted = !camWanted;
+  $('btnCam').classList.toggle('cam-on', camWanted);
+  $('btnCam').textContent = camWanted ? '카메라 끄기' : '카메라';
+  camWanted ? startCam() : stopCam();
+};
+document.addEventListener('visibilitychange', () => { if (document.hidden) stopCam(false); else if (camWanted) startCam(); });
+addEventListener('pagehide', () => stopCam(false));
+
+function grabBox() {
+  const vw = video.videoWidth, vh = video.videoHeight; if (!vw) return null;
+  const el = video.getBoundingClientRect(), bx = box.getBoundingClientRect();
+  const k = Math.max(el.width / vw, el.height / vh);
+  const ox = (el.width - vw * k) / 2, oy = (el.height - vh * k) / 2;
+  const sx = Math.max(0, (bx.left - el.left - ox) / k), sy = Math.max(0, (bx.top - el.top - oy) / k);
+  const sw = Math.min(vw - sx, bx.width / k), sh = Math.min(vh - sy, bx.height / k);
+  if (sw < 10 || sh < 10) return null;
+  canvas.width = Math.round(sw); canvas.height = Math.round(sh);
+  ctx.drawImage(video, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height);
+  return ctx.getImageData(0, 0, canvas.width, canvas.height);
+}
+async function loop(my) {
+  if (!(await libReady)) return;
+  while (scanning && my === camToken) {
+    const img = grabBox();
+    if (img) {
+      try { const res = await readBarcodes(img, READ_OPTS); if (my === camToken) addSerials(serialsFrom(res)); }
+      catch (e) { setStatus('인식 오류: ' + e.message); }
+      if (scanning && my === camToken) setStatus(`스캔 중 · ${list.length}건`);
+    }
+    await sleep(120);
+  }
+}
+
+// ================= 사진파일 =================
+$('file').onchange = async e => {
+  const f = e.target.files[0]; if (!f) return;
+  setStatus('사진 분석 중...');
+  if (!(await libReady)) return;
+  try {
+    const bmp = await createImageBitmap(f, { imageOrientation: 'from-image' });
+    const k = Math.min(1, 2400 / Math.max(bmp.width, bmp.height));
+    const c = document.createElement('canvas'); c.width = Math.round(bmp.width * k); c.height = Math.round(bmp.height * k);
+    const cx = c.getContext('2d', { willReadFrequently: true }); cx.drawImage(bmp, 0, 0, c.width, c.height);
+    const n = addSerials(serialsFrom(await readBarcodes(cx.getImageData(0, 0, c.width, c.height), READ_OPTS)));
+    setStatus(n ? `사진에서 ${n}건 추가` : !$('chooser').classList.contains('hidden') ? '모델 선택 대기 중' : ($('dupMsg').classList.contains('off') ? '사진에서 새 일련번호를 찾지 못했습니다' : ''));
+  } catch (err) { setStatus('사진 분석 실패: ' + err.message); }
+  e.target.value = '';
+};
+
+// ================= 입력완료 / 초기화 =================
+$('btnSend').onclick = async () => {
+  if (!picked) { toast('P코드를 먼저 선택하세요'); $('pcode').focus(); return; }
+  if (!list.length) return;
+  if (!confirm(`${picked.name} (${picked.code})\n${list.length}건을 전송할까요?`)) return;
+  $('btnSend').disabled = true; setStatus('전송 중...');
+  try {
+    await AW.createDoc(C.databaseId, C.surveyCollectionId, {
+      pcode: picked.code, store: picked.name, count: list.length,
+      items: JSON.stringify(list.map(x => ({ m: x.model, s: x.serial, r: x.serialRaw, k: x.matched ? 1 : 0 })))
+    });
+    beep(2400); toast(`${list.length}건 전송 완료`);
+    setStatus(`${picked.name} · ${list.length}건 전송 완료`);
+    list = []; saveDraft(); renderList();
+  } catch (e) {
+    alert('전송 실패: ' + e.message + '\n(목록은 그대로 남아 있으니 다시 [입력완료]를 누르세요)');
+    setStatus('전송 실패');
+  } finally { updateSend(); }
+};
+$('btnClear').onclick = () => {
+  if (list.length && !confirm(`인식 결과 ${list.length}건을 모두 지울까요?`)) return;
+  list = []; saveDraft(); renderList(); setStatus('');
+};
+
+renderList();
+loadData();
 </script>
 </body>
 </html>
