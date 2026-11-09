@@ -32,28 +32,39 @@
     return rows.filter(r => r.some(v => String(v).trim() !== ''));
   }
 
-  // 2차원 배열(헤더 포함) → [{model, serial, price}] ; 헤더 이름으로 컬럼 자동 탐색
+  // 2차원 배열(헤더 포함) → 재고 행 배열. 헤더 이름으로 컬럼 자동 탐색
+  //  - 재고 엑셀 양식: POS코드, POS그룹명, POS닉네임, 단말모델, 일련번호, 단말색상, 출고가 … (다른 컬럼은 무시)
+  //  - 예전 양식(모델명, 일련번호, 출고가)도 그대로 읽힘
   function toStockRows(table) {
     const hi = table.findIndex(r => r.some(v => /모델/.test(v)) && r.some(v => /일련/.test(v)));
-    if (hi < 0) throw new Error('헤더에 "모델명", "일련번호" 컬럼이 필요합니다');
-    const h = table[hi].map(v => String(v).trim());
-    const iM = h.findIndex(v => /모델/.test(v));
-    const iS = h.findIndex(v => /일련/.test(v));
-    const iP = h.findIndex(v => /출고가|가격|단가/.test(v));
+    if (hi < 0) throw new Error('헤더에 "단말모델(모델명)", "일련번호" 컬럼이 필요합니다');
+    const h = table[hi].map(v => String(v).replace(/\s/g, ''));
+    const col = (...res) => { for (const re of res) { const i = h.findIndex(v => re.test(v)); if (i >= 0) return i; } return -1; };
+    const iM = col(/^단말모델$/, /모델/);
+    const iS = col(/일련/);
+    const iP = col(/출고가/, /가격|단가/);
+    const iC = col(/^POS코드$/i, /^P코드$/i);
+    const iG = col(/^POS그룹/i);
+    const iN = col(/^POS닉네임/i);
+    const iK = col(/색상/);
+    const val = (r, i) => i >= 0 ? String(r[i] ?? '').trim() : '';
     const out = [];
     for (const r of table.slice(hi + 1)) {
-      const model = String(r[iM] ?? '').trim();
-      const serial = norm(r[iS]);   // 앞자리 0 빠짐(0123456→123456)은 매칭 키에서 처리 (keysOf)
+      const model = val(r, iM);
+      const serial = norm(r[iS]);   // 앞자리 0 빠짐(0123456→123456)은 매칭 키에서 처리
       if (!model || !serial) continue;
       const price = iP >= 0 ? Number(String(r[iP] ?? '').replace(/[^\d.-]/g, '')) || 0 : 0;
-      out.push({ model, serial, price });
+      out.push({ model, serial, price, posCode: val(r, iC), group: val(r, iG), nick: val(r, iN), color: val(r, iK) });
     }
     return out;
   }
 
-  function toCSV(rows) {
-    const esc = v => /[",\n]/.test(String(v)) ? '"' + String(v).replace(/"/g, '""') + '"' : v;
-    return '﻿모델명,일련번호,출고가\n' + rows.map(r => [r.model, r.serial, r.price].map(esc).join(',')).join('\n');
+  const csvEsc = v => /[",\n]/.test(String(v ?? '')) ? '"' + String(v).replace(/"/g, '""') + '"' : String(v ?? '');
+  // 저장용 CSV: withPrice=false 이면 공개용(출고가 제외)
+  function toCSV(rows, withPrice = true) {
+    const head = ['POS코드', 'POS그룹명', 'POS닉네임', '단말모델', '일련번호', '단말색상'].concat(withPrice ? ['출고가'] : []);
+    const body = rows.map(r => [r.posCode, r.group, r.nick, r.model, r.serial, r.color].concat(withPrice ? [r.price] : []).map(csvEsc).join(','));
+    return '\uFEFF' + head.join(',') + '\n' + body.join('\n');
   }
 
   // 매칭 인덱스
