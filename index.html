@@ -62,6 +62,14 @@
   @keyframes dupflash{from{background:rgba(239,68,68,.35)}to{background:transparent}}
   #dupMsg{color:var(--bad);font-weight:700;font-size:15px;min-height:22px;margin-top:10px;transition:opacity .3s}
   #dupMsg.off{opacity:0}
+  header .hbtns{display:flex;align-items:center;gap:6px}
+  #btnStat{background:rgba(16,185,129,.15);color:var(--acc);border:1px solid rgba(16,185,129,.45);padding:7px 11px;font-size:13px;border-radius:999px}
+  #statView{position:fixed;inset:0;background:var(--bg);z-index:40;overflow:auto}
+  #statView header{position:sticky;top:0;background:var(--bg);z-index:2}
+  #statView main{padding-top:10px}
+  .st-sum{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:12px}
+  .st-sum div{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:9px 6px;text-align:center;font-size:11px;color:var(--sub)}
+  .st-sum b{display:block;font-size:18px;color:var(--txt);margin-bottom:2px}
   #chooser{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:50;display:flex;align-items:flex-end;justify-content:center}
   #chooser .sheet{background:var(--card);border-top-left-radius:18px;border-top-right-radius:18px;width:100%;max-width:560px;padding:18px 16px calc(18px + env(safe-area-inset-bottom))}
   #chooser h3{margin:0 0 4px;font-size:18px}
@@ -120,14 +128,14 @@
   </div>
   <div id="recentPick" class="hidden"></div>
   <div class="info" style="justify-content:center"><span id="dataInfo">판매점·재고 목록 불러오는 중...</span><a id="btnReload">새로고침</a></div>
-  <div class="ver">버전 20261013p</div>
+  <div class="ver">버전 20261109a</div>
 </div>
 
 <!-- 조사 화면 -->
 <div id="scanView" class="hidden">
 <header>
   <div class="who"><span class="k" id="whoKind">판매점</span><b id="whoName"></b><code id="whoCode"></code></div>
-  <a class="chg" id="btnChange">변경</a>
+  <div class="hbtns"><button id="btnStat">조사현황</button><a class="chg" id="btnChange">변경</a></div>
 </header>
 <main>
   <div class="cam" style="margin-top:0">
@@ -150,6 +158,14 @@
   </div>
 </main>
 </div>
+<div id="statView" class="hidden">
+<header><b id="stTitle" style="font-size:17px">조사현황</b><a class="chg" id="btnStClose">닫기</a></header>
+<main>
+  <div class="st-sum" id="stSum"></div>
+  <div class="card" style="margin-top:0"><div id="stBody">불러오는 중...</div></div>
+  <div class="info" style="justify-content:center;margin-top:10px"><span id="stAt"></span><a id="btnStReload">새로고침</a></div>
+</main>
+</div>
 <div id="chooser" class="hidden"><div class="sheet">
   <h3>모델을 선택하세요</h3>
   <div class="sn" id="chSerial"></div>
@@ -158,9 +174,10 @@
 </div></div>
 <div class="toast" id="toast"></div>
 
-<script src="config.js?v=20261013p"></script>
-<script src="appwrite.js?v=20261013p"></script>
-<script src="stock.js?v=20261013p"></script>
+<script src="config.js?v=20261109a"></script>
+<script src="appwrite.js?v=20261109a"></script>
+<script src="stock.js?v=20261109a"></script>
+<script src="stats.js?v=20261109a"></script>
 <script type="module">
 const $ = id => document.getElementById(id);
 const C = window.APP_CONFIG;
@@ -191,6 +208,7 @@ updateInstallBar();
 // ================= 데이터 (판매점 / 재고) =================
 let stores = [];           // [{code, name}]
 let stockIdx = null;       // 일련번호 → 모델명
+let baseRows = null, curRows = null;   // 기준재고 / 현재재고 (조사현황용)
 let picked = null;         // {code, name}
 
 function parseTable(text) { return Stock.parseCSV(String(text).replace(/^﻿/, '')); }
@@ -202,11 +220,16 @@ async function loadData() {
     stores = t.slice(1).map(r => ({ code: String(r[0] || '').trim(), name: String(r[1] || '').trim() })).filter(s => s.code || s.name);
     msgs.push(`판매점 ${stores.length.toLocaleString()}곳`);
   } catch (e) { msgs.push('판매점 목록 없음'); }
-  try {
-    const rows = Stock.toStockRows(parseTable(await AW.fileText(C.publicBucketId, C.pubStockFileId)));
-    stockIdx = Stock.buildIndex(rows);
-    msgs.push(`재고 ${rows.length.toLocaleString()}건`);
-  } catch (e) { stockIdx = null; msgs.push('재고리스트 없음'); }
+  // 기준재고 + 현재재고 (모델명 찾기는 두 목록을 합쳐서, 통계는 각각 사용)
+  const [b, c] = await Promise.all([
+    AW.fileText(C.publicBucketId, C.basePubFileId).then(t => Stock.toStockRows(parseTable(t))).catch(() => null),
+    AW.fileText(C.publicBucketId, C.curPubFileId).then(t => Stock.toStockRows(parseTable(t))).catch(() => null)
+  ]);
+  baseRows = b; curRows = c;
+  const union = [...new Map([...(b || []), ...(c || [])].map(r => [Stats.key(r.model, r.serial), r])).values()];
+  stockIdx = union.length ? Stock.buildIndex(union) : null;
+  msgs.push(b ? `기준재고 ${b.length.toLocaleString()}건` : '기준재고 없음');
+  if (c) msgs.push(`현재재고 ${c.length.toLocaleString()}건`);
   $('dataInfo').textContent = msgs.join(' · ');
   showRecentPick();
   relabel();
@@ -284,6 +307,50 @@ function showRecentPick() {   // 최근 조사자 바로 이어하기
   el.classList.remove('hidden');
   $('btnResume').onclick = () => enter(p.kind ? p : { kind: 'store', ...p });
 }
+// ================= 조사현황 =================
+async function openStats() {
+  if (camWanted) $('btnCam').click();             // 카메라 끄기
+  $('statView').classList.remove('hidden'); scrollTo(0, 0);
+  $('stTitle').textContent = picked.kind === 'staff' ? `${picked.name} 조사현황` : `${picked.name} 조사현황`;
+  $('stBody').textContent = '불러오는 중...'; $('stSum').innerHTML = '';
+  try {
+    if (!baseRows) await loadData();
+    if (!baseRows) { $('stBody').innerHTML = '<span class="empty">기준재고가 아직 등록되지 않았습니다</span>'; return; }
+    const docs = await AW.listAll(C.databaseId, C.surveyCollectionId, 500);
+    const { entries } = Stats.entriesFromDocs(docs);
+    const res = Stats.compute(baseRows, curRows, entries);
+    const d = new Date(); $('stAt').textContent = `${d.getHours()}:${String(d.getMinutes()).padStart(2, '0')} 기준 · 전송 완료된 입력만 반영`;
+    const box = $('stBody');
+    let mine = null;
+    if (picked.kind === 'staff') {
+      // 접속한 이름 = 재고목록의 POS그룹명 → 소속 지역 통계부터, 본인 POS닉네임별 표를 바로 보여줌
+      const name = picked.name.trim();
+      const hasGroup = baseRows.some(r => r.group === name) || (curRows || []).some(r => r.group === name);
+      if (!hasGroup) { box.innerHTML = `<span class="empty">"${esc(name)}" 이름이 재고목록의 POS그룹명과 일치하지 않습니다.<br>재고목록에 적힌 이름 그대로 입력했는지 확인하세요.</span>`; return; }
+      const region = Stats.regionOf(name);
+      mine = Stats.aggregate(res, 'group', r => r.group === name).map.get(name);
+      Stats.mount(box, res, { path: [{ level: 'all' }, { level: 'region', v: region }, { level: 'group', v: name }], minDepth: 1, highlight: name });
+    } else {
+      // 판매점: 내 P코드의 미완료 목록
+      const sid = picked.code;
+      const nick = (baseRows.find(r => r.posCode === sid) || (curRows || []).find(r => r.posCode === sid) || {}).nick;
+      if (!nick) { box.innerHTML = '<span class="empty">이 판매점(P코드)의 기준재고가 없습니다</span>'; return; }
+      mine = Stats.aggregate(res, 'store', r => Stats.storeId(r) === sid).map.get(sid);
+      Stats.mount(box, res, { path: [{ level: 'all' }, { level: 'store', v: sid, name: nick }], minDepth: 1 });
+    }
+    if (mine) {
+      const t = mine.done + mine.todo + mine.incTodo;
+      $('stSum').innerHTML = `<div><b>${mine.base.toLocaleString()}</b>기준재고</div><div><b style="color:var(--ok)">${mine.done.toLocaleString()}</b>조사완료</div>` +
+        `<div><b style="color:var(--sub)">${(mine.sold + mine.moved).toLocaleString()}</b>판매(이관)</div><div><b style="color:var(--warn)">${(mine.todo + mine.incTodo).toLocaleString()}</b>미완료 ${t ? Math.round(mine.done / t * 100) : 0}%</div>`;
+    }
+  } catch (e) {
+    $('stBody').innerHTML = `<span class="empty">불러오기 실패: ${esc(e.message)}</span>` + (e.code === 401 ? '<br><span class="empty">surveys 컬렉션 읽기 권한(Any)을 확인하세요</span>' : '');
+  }
+}
+$('btnStat').onclick = openStats;
+$('btnStReload').onclick = openStats;
+$('btnStClose').onclick = () => { $('statView').classList.add('hidden'); };
+
 $('btnChange').onclick = () => {
   if (camWanted) $('btnCam').click();          // 카메라 끄기
   picked = null; updateSend();
