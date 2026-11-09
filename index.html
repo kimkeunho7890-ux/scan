@@ -128,7 +128,7 @@
   </div>
   <div id="recentPick" class="hidden"></div>
   <div class="info" style="justify-content:center"><span id="dataInfo">판매점·재고 목록 불러오는 중...</span><a id="btnReload">새로고침</a></div>
-  <div class="ver">버전 20261109e</div>
+  <div class="ver">버전 20261109f</div>
 </div>
 
 <!-- 조사 화면 -->
@@ -174,10 +174,10 @@
 </div></div>
 <div class="toast" id="toast"></div>
 
-<script src="config.js?v=20261109e"></script>
-<script src="appwrite.js?v=20261109e"></script>
-<script src="stock.js?v=20261109e"></script>
-<script src="stats.js?v=20261109e"></script>
+<script src="config.js?v=20261109f"></script>
+<script src="appwrite.js?v=20261109f"></script>
+<script src="stock.js?v=20261109f"></script>
+<script src="stats.js?v=20261109f"></script>
 <script type="module">
 const $ = id => document.getElementById(id);
 const C = window.APP_CONFIG;
@@ -340,9 +340,9 @@ async function openStats() {
       Stats.mount(box, res, { path: [{ level: 'all' }, { level: 'store', v: sid, name: nick }], minDepth: 1 });
     }
     if (mine) {
-      const t = mine.done + mine.todo + mine.incTodo;
-      $('stSum').innerHTML = `<div><b>${mine.base.toLocaleString()}</b>기준재고</div><div><b style="color:var(--ok)">${mine.done.toLocaleString()}</b>조사완료</div>` +
-        `<div><b style="color:var(--sub)">${(mine.sold + mine.moved).toLocaleString()}</b>판매(이관)</div><div><b style="color:var(--warn)">${(mine.todo + mine.incTodo).toLocaleString()}</b>미완료 ${t ? Math.round(mine.done / t * 100) : 0}%</div>`;
+      const pc = mine.base ? Math.round((mine.done + mine.sold) / mine.base * 100) : 0;
+      $('stSum').innerHTML = `<div><b>${mine.base.toLocaleString()}</b>기준재고${(mine.out || mine.in) ? `<br><span style="font-size:10px">원래 ${mine.base0}${mine.out ? ' −' + mine.out : ''}${mine.in ? ' +' + mine.in : ''}</span>` : ''}</div><div><b style="color:var(--ok)">${mine.done.toLocaleString()}</b>입력완료</div>` +
+        `<div><b style="color:var(--sub)">${mine.sold.toLocaleString()}</b>개통완료</div><div><b style="color:var(--warn)">${mine.todo.toLocaleString()}</b>미완료 · ${pc}%</div>`;
     }
   } catch (e) {
     $('stBody').innerHTML = `<span class="empty">불러오기 실패: ${esc(e.message)}</span>` + (e.code === 401 ? '<br><span class="empty">surveys 컬렉션 읽기 권한(Any)을 확인하세요</span>' : '');
