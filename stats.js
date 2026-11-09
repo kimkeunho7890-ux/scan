@@ -3,8 +3,8 @@
   // ---------- 지역 그룹 (POS그룹명 → 지역) ----------
   const REGION_DEF = [
     ['부산', ['여상식', '강슬기', '정준호', '나재철', '공진석', '강숭교', '전라도', '부산팀']],
-    ['울산', ['전하영', '이기형', '신진호', '배웅', '울산팀']],
     ['경남', ['한성철', '김현중', '유승열', '경남팀']],
+    ['울산', ['전하영', '이기형', '신진호', '배웅', '울산팀']],
     ['경주포항', ['손병현', '김시우', '경북팀']],
     ['대구', ['최승형', '구본석', '김민우', '대구팀']],
     ['구미', ['이남협', '박유경', '구미팀']],
@@ -39,10 +39,11 @@
   }
 
   // ---------- 핵심 비교 ----------
-  // 상태: done=입력완료(조사됨) / sold=개통완료(현재재고에 없음) / todo=미완료
+  // 상태: done=입력완료(조사됨) / sold=개통완료(현재재고에 없음) / lost=분실(관리자가 분실 등록) / todo=미완료
   // 이관(현재재고에서 다른 판매점·영업사원): 단말은 아직 우리 재고 → 현재 위치(B)로 기준재고를 옮기고 B에서 조사해야 완료
   //   단, 옮기기 전에 원래 판매점(A)에서 이미 조사한 건은 A의 입력완료로 둠
-  function compute(base, cur, entries) {
+  function compute(base, cur, entries, lost) {
+    const lostMap = new Map((lost || []).map(l => [key(l.model, l.serial), l]));
     const bySerial = new Map();
     for (const b of base) { const c = canon(b.serial); if (!bySerial.has(c)) bySerial.set(c, []); bySerial.get(c).push(b); }
     // 조사 입력 → 기준재고 행 매칭 (모델+일련번호, 모델 미확인 입력은 일련번호가 유일할 때만)
@@ -65,15 +66,16 @@
       // 원래 판매점에서 조사된 입력인지 (그 판매점 P코드로 입력했거나, 담당 영업사원 이름으로 입력)
       const svAtBase = !!(sv && (sv.pcode === b.posCode || (sv.staff && sv.staff === b.group)));
       const owner = moved && !svAtBase ? c : b;            // 통계에 잡히는 판매점
-      const status = sv ? 'done' : !c ? 'sold' : 'todo';
-      return { b, c, sv, status, moved, owner };
+      const ls = lostMap.get(k) || null;
+      const status = sv ? 'done' : !c ? 'sold' : ls ? 'lost' : 'todo';   // 조사됐거나 개통됐으면 분실 등록보다 우선
+      return { b, c, sv, status, moved, owner, lost: ls };
     });
-    return { items, hasCur: !!cur, surveyedCount: surveyed.size };
+    return { items, hasCur: !!cur, surveyedCount: surveyed.size, lostCount: [...lostMap.keys()].length };
   }
 
   // ---------- 집계 ----------
   // base0=원래 기준재고, out=이관출고, in=이관입고, base=조정 기준재고(=base0-out+in), done/sold/todo 는 조정 기준
-  const empty = () => ({ base0: 0, out: 0, in: 0, base: 0, done: 0, sold: 0, todo: 0 });
+  const empty = () => ({ base0: 0, out: 0, in: 0, base: 0, done: 0, sold: 0, lost: 0, todo: 0 });
   function aggregate(res, level, filter = () => true) {
     const kf = { region: r => regionOf(r.group), group: r => r.group || '(미지정)', store: r => storeId(r) }[level];
     const map = new Map(), names = new Map();
@@ -110,7 +112,7 @@
   .st-tbl tr.go{cursor:pointer} .st-tbl tr.go:active td,.st-tbl tr.go:hover td{background:#222733}
   .st-tbl tr.me td{background:rgba(16,185,129,.10)}
   .st-tbl tr.tot td{font-weight:800;border-top:2px solid #3a4150}
-  .st-tbl .done{color:#22c55e} .st-tbl .gone{color:#9aa3b2} .st-tbl .todo{color:#f59e0b;font-weight:700}
+  .st-tbl .done{color:#22c55e} .st-tbl .gone{color:#9aa3b2} .st-tbl .lost{color:#f87171} .st-tbl .todo{color:#f59e0b;font-weight:700}
   .st-tbl small{display:block;color:#60a5fa;font-size:11px;font-weight:400}
   .st-bar{height:5px;background:#2a2f3a;border-radius:3px;margin-top:3px;overflow:hidden}
   .st-bar i{display:block;height:100%;background:#22c55e}
@@ -161,12 +163,13 @@
       else keys.sort((a, b) => (map.get(b).base - map.get(a).base) || String(names.get(a)).localeCompare(names.get(b)));
       if (!keys.length) return '<div class="st-empty">해당하는 재고가 없습니다</div>';
       const label = { region: '지역', group: 'POS그룹', store: 'POS닉네임' }[childLevel];
+      const showLost = res.items.some(it => it.status === 'lost');
       const row = (k, a, cls = '') => `<tr class="${cls}" ${cls.includes('tot') ? '' : `data-k="${esc(k)}" data-name="${esc(names.get(k))}"`}>
         <td>${esc(childLevel === 'store' && !cls.includes('tot') ? names.get(k) : k)}${(a.out || a.in) ? `<small>원래 ${n(a.base0)}${a.out ? ` · 이관출고 −${n(a.out)}` : ''}${a.in ? ` · 이관입고 +${n(a.in)}` : ''}</small>` : ''}
           <div class="st-bar"><i style="width:${pct(a)}%"></i></div></td>
-        <td>${n(a.base)}</td><td class="done">${n(a.done)}</td><td class="gone">${n(a.sold)}</td><td class="todo">${n(a.todo)}</td><td>${pct(a)}%</td></tr>`;
+        <td>${n(a.base)}</td><td class="done">${n(a.done)}</td><td class="gone">${n(a.sold)}</td>${showLost ? `<td class="lost">${n(a.lost)}</td>` : ''}<td class="todo">${n(a.todo)}</td><td>${pct(a)}%</td></tr>`;
       const tot = sum(keys.map(k => map.get(k)));
-      return `<table class="st-tbl"><thead><tr><th>${label}</th><th>기준재고</th><th>입력완료</th><th>개통완료</th><th>미완료</th><th>진행률</th></tr></thead><tbody>
+      return `<table class="st-tbl"><thead><tr><th>${label}</th><th>기준재고</th><th>입력완료</th><th>개통완료</th>${showLost ? '<th>분실</th>' : ''}<th>미완료</th><th>진행률</th></tr></thead><tbody>
         ${row('합계', tot, 'tot')}
         ${keys.map(k => row(k, map.get(k), 'go' + (highlight && (k === highlight) ? ' me' : ''))).join('')}
       </tbody></table>
@@ -176,7 +179,7 @@
     const listHtml = (sid, group) => {
       const rows = todoList(res, sid, group);
       const a = aggregate(res, 'store', r => storeId(r) === sid && (group == null || (r.group || '(미지정)') === group)).map.get(sid) || empty();
-      const head = `<div class="st-note" style="margin:0 0 8px">기준재고 ${n(a.base)}${(a.out || a.in) ? ` (원래 ${n(a.base0)}${a.out ? ' −' + n(a.out) : ''}${a.in ? ' +' + n(a.in) : ''})` : ''} · 입력완료 <b style="color:#22c55e">${n(a.done)}</b> · 개통완료 ${n(a.sold)} · <b style="color:#f59e0b">미완료 ${n(rows.length)}</b></div>`;
+      const head = `<div class="st-note" style="margin:0 0 8px">기준재고 ${n(a.base)}${(a.out || a.in) ? ` (원래 ${n(a.base0)}${a.out ? ' −' + n(a.out) : ''}${a.in ? ' +' + n(a.in) : ''})` : ''} · 입력완료 <b style="color:#22c55e">${n(a.done)}</b> · 개통완료 ${n(a.sold)}${a.lost ? ` · <span style="color:#f87171">분실 ${n(a.lost)}</span>` : ''} · <b style="color:#f59e0b">미완료 ${n(rows.length)}</b></div>`;
       if (!rows.length) return head + '<div class="st-empty">조사 미완료 재고가 없습니다</div>';
       rows.sort((x, y) => x.r.model.localeCompare(y.r.model) || canon(x.r.serial).localeCompare(canon(y.r.serial)));
       return head + `<table class="st-tbl st-list"><thead><tr><th>POS닉네임</th><th>단말모델</th><th>일련번호</th><th>색상</th></tr></thead><tbody>
