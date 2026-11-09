@@ -263,10 +263,10 @@
   </div>
 </main>
 
-<script src="config.js?v=20261110a"></script>
-<script src="appwrite.js?v=20261110a"></script>
-<script src="stock.js?v=20261110a"></script>
-<script src="stats.js?v=20261110a"></script>
+<script src="config.js?v=20261110b"></script>
+<script src="appwrite.js?v=20261110b"></script>
+<script src="stock.js?v=20261110b"></script>
+<script src="stats.js?v=20261110b"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script>
 const $ = id => document.getElementById(id);
@@ -738,11 +738,19 @@ $('btnRpXlsx').onclick = async () => {
 // ================= 분실 목록 =================
 let lostList = [];   // [{model, serial, prev:'Y'|'N', memo}]
 async function loadLost() {
-  try { lostList = JSON.parse(await AW.fileText(C.bucketId, C.lostFileId) || '[]'); } catch (e) { lostList = []; if (e.code !== 404) throw e; }
+  let txt = '';
+  try { txt = await AW.fileText(C.bucketId, C.lostFileId) || ''; } catch (e) { lostList = []; if (e.code !== 404) throw e; return lostList; }
+  txt = txt.replace(/^\uFEFF/, '').trim();
+  if (txt.startsWith('[')) { lostList = JSON.parse(txt); return lostList; }        // 예전 JSON 형식
+  const rows = Stock.parseCSV(txt).slice(1);                                          // 모델명,일련번호,기존분실건,비고
+  lostList = rows.filter(r => r[0] && r[1]).map(r => ({ model: String(r[0]).trim(), serial: Stock.norm(r[1]), prev: String(r[2] || '').trim().toUpperCase() === 'Y' ? 'Y' : 'N', memo: String(r[3] || '').trim() }));
   return lostList;
 }
 async function saveLost() {
-  await AW.replaceFile(C.bucketId, C.lostFileId, new Blob([JSON.stringify(lostList)], { type: 'application/json' }), 'lost.json');
+  // 기준재고(base.csv)와 같은 CSV 형식으로 저장 → 버킷의 허용 확장자 설정에 막히지 않음
+  const q = v => /[",\n]/.test(String(v ?? '')) ? '"' + String(v).replace(/"/g, '""') + '"' : String(v ?? '');
+  const csv = '\uFEFF모델명,일련번호,기존분실건,비고\n' + lostList.map(l => [l.model, l.serial, l.prev, l.memo].map(q).join(',')).join('\n');
+  await AW.replaceFile(C.bucketId, C.lostFileId, new Blob([csv], { type: 'text/csv' }), 'lost.csv');
 }
 const baseByKey = () => new Map((baseRows || []).map(r => [Stats.key(r.model, r.serial), r]));
 function renderLost() {
