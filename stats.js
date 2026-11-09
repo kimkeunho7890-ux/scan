@@ -31,7 +31,7 @@
         const k = N(x.s); if (!k) continue;
         if (seen.has(k)) { dup++; continue; }
         seen.add(k);
-        out.push({ pcode: d.pcode, store: d.pcode === '영업사원' ? `${d.store} (영업사원)` : d.store,
+        out.push({ pcode: d.pcode, staff: d.pcode === '영업사원' ? d.store : '', store: d.pcode === '영업사원' ? `${d.store} (영업사원)` : d.store,
                    model: x.m || '', serial: x.s || '', serialRaw: x.r || x.s || '', matched: !!x.k, at: d.$createdAt });
       }
     }
@@ -39,13 +39,12 @@
   }
 
   // ---------- 핵심 비교 ----------
-  // 상태: done=조사완료 / sold=판매(현재재고에 없음) / moved=이관(현재재고에서 다른 판매점) / todo=조사미완료
+  // 상태: done=입력완료(조사됨) / sold=개통완료(현재재고에 없음) / todo=미완료
+  // 이관(현재재고에서 다른 판매점·영업사원): 단말은 아직 우리 재고 → 현재 위치(B)로 기준재고를 옮기고 B에서 조사해야 완료
+  //   단, 옮기기 전에 원래 판매점(A)에서 이미 조사한 건은 A의 입력완료로 둠
   function compute(base, cur, entries) {
-    const baseMap = new Map(), bySerial = new Map();
-    for (const b of base) {
-      baseMap.set(key(b.model, b.serial), b);
-      const c = canon(b.serial); if (!bySerial.has(c)) bySerial.set(c, []); bySerial.get(c).push(b);
-    }
+    const bySerial = new Map();
+    for (const b of base) { const c = canon(b.serial); if (!bySerial.has(c)) bySerial.set(c, []); bySerial.get(c).push(b); }
     // 조사 입력 → 기준재고 행 매칭 (모델+일련번호, 모델 미확인 입력은 일련번호가 유일할 때만)
     const surveyed = new Map();
     const candsOf = s => [...new Set([...new Set(Stock.keysOf(s).map(canon))].flatMap(c => bySerial.get(c) || []))];
@@ -61,44 +60,41 @@
     const curMap = new Map(); if (cur) for (const c of cur) curMap.set(key(c.model, c.serial), c);
     const items = base.map(b => {
       const k = key(b.model, b.serial), c = cur ? (curMap.get(k) || null) : b, sv = surveyed.get(k) || null;
-      const status = sv ? 'done' : !c ? 'sold' : storeId(c) !== storeId(b) ? 'moved' : 'todo';
-      return { b, c, sv, status };
+      const moved = !!(c && storeId(c) !== storeId(b));
+      // 원래 판매점에서 조사된 입력인지 (그 판매점 P코드로 입력했거나, 담당 영업사원 이름으로 입력)
+      const svAtBase = !!(sv && (sv.pcode === b.posCode || (sv.staff && sv.staff === b.group)));
+      const owner = moved && !svAtBase ? c : b;            // 통계에 잡히는 판매점
+      const status = sv ? 'done' : !c ? 'sold' : 'todo';
+      return { b, c, sv, status, moved, owner };
     });
-    // 이관입고: 기준재고엔 A판매점, 현재재고엔 B판매점 → B 쪽에 +1
-    const incoming = [];
-    if (cur) for (const c of cur) {
-      const k = key(c.model, c.serial), b = baseMap.get(k);
-      if (b && storeId(b) !== storeId(c)) incoming.push({ b, c, sv: surveyed.get(k) || null });
-    }
-    return { items, incoming, hasCur: !!cur, surveyedCount: surveyed.size };
+    return { items, hasCur: !!cur, surveyedCount: surveyed.size };
   }
 
   // ---------- 집계 ----------
-  const empty = () => ({ base: 0, done: 0, sold: 0, moved: 0, todo: 0, incIn: 0, incTodo: 0 });
+  // base0=원래 기준재고, out=이관출고, in=이관입고, base=조정 기준재고(=base0-out+in), done/sold/todo 는 조정 기준
+  const empty = () => ({ base0: 0, out: 0, in: 0, base: 0, done: 0, sold: 0, todo: 0 });
   function aggregate(res, level, filter = () => true) {
     const kf = { region: r => regionOf(r.group), group: r => r.group || '(미지정)', store: r => storeId(r) }[level];
     const map = new Map(), names = new Map();
-    const get = k => { if (!map.has(k)) map.set(k, empty()); return map.get(k); };
+    const get = (k, r) => { if (!map.has(k)) map.set(k, empty()); if (!names.has(k)) names.set(k, r.nick || k); return map.get(k); };
     for (const it of res.items) {
-      if (!filter(it.b)) continue;
-      const k = kf(it.b), a = get(k); names.set(k, it.b.nick || k);
-      a.base++; a[it.status]++;
-    }
-    for (const x of res.incoming) {
-      if (!filter(x.c)) continue;
-      const k = kf(x.c), a = get(k); names.set(k, names.get(k) || x.c.nick || k);
-      a.incIn++; if (!x.sv) a.incTodo++;
+      const fb = filter(it.b), fo = filter(it.owner);
+      const kb = fb ? kf(it.b) : null, ko = fo ? kf(it.owner) : null;
+      if (fb) get(kb, it.b).base0++;
+      if (fo) { const a = get(ko, it.owner); a.base++; a[it.status]++; }
+      if (it.owner !== it.b && kb !== ko) {               // 다른 단위로 이관된 경우만 출고/입고로 셈
+        if (fb && kf(it.b) !== kf(it.owner)) get(kb, it.b).out++;
+        if (fo && kf(it.b) !== kf(it.owner)) get(ko, it.owner).in++;
+      }
     }
     return { map, names };
   }
   const sum = list => list.reduce((t, a) => { for (const k in t) t[k] += a[k] || 0; return t; }, empty());
 
-  // 판매점(POS코드)별 조사 미완료 목록: 아직 그 판매점에 있는 미조사 + 이관입고 미조사
+  // 판매점(POS코드)별 미완료 목록: 지금 그 판매점에 있는 미조사 단말 (이관입고 표시 포함)
   function todoList(res, sid) {
-    const rows = res.items.filter(it => it.status === 'todo' && storeId(it.b) === sid)
-      .map(it => ({ r: it.c || it.b, tag: '' }));
-    for (const x of res.incoming) if (!x.sv && storeId(x.c) === sid) rows.push({ r: x.c, tag: '이관입고', from: x.b.nick });
-    return rows;
+    return res.items.filter(it => it.status === 'todo' && storeId(it.owner) === sid)
+      .map(it => ({ r: it.c || it.b, tag: storeId(it.b) !== sid ? '이관입고' : '', from: storeId(it.b) !== sid ? it.b.nick : '' }));
   }
 
   // ---------- 드릴다운 화면 ----------
@@ -126,7 +122,7 @@
   const n = v => (v || 0).toLocaleString();
   // 삼성은 라벨처럼 7자리로 표시 (엑셀에서 빠진 앞자리 0 복원)
   const showSerial = r => /^SM-/i.test(r.model) && /^\d{1,6}$/.test(r.serial) ? r.serial.padStart(7, '0') : r.serial;
-  const pct = a => { const t = a.done + a.todo + a.incTodo; return t ? Math.round(a.done / t * 100) : (a.base ? 100 : 0); };
+  const pct = a => a.base ? Math.round((a.done + a.sold) / a.base * 100) : 0;   // 진행률 = (입력완료+개통완료) / 조정 기준재고
 
   // path: [{level:'all'}, {level:'region', v}, {level:'group', v}, {level:'store', v, name}]
   function mount(el, res, opts = {}) {
@@ -143,7 +139,7 @@
       let html = `<div class="st-crumb">${crumb}</div>`;
       if (cur.level === 'store') html += listHtml(cur.v);
       else html += tableHtml(cur);
-      if (!res.hasCur) html += `<div class="st-note">※ 현재재고가 등록되지 않아 판매(이관)완료는 0으로 표시됩니다.</div>`;
+      if (!res.hasCur) html += `<div class="st-note">※ 현재재고가 등록되지 않아 개통완료·이관은 반영되지 않았습니다.</div>`;
       el.innerHTML = html;
       el.querySelectorAll('[data-up]').forEach(a => a.onclick = () => { path = path.slice(0, +a.dataset.up + 1); draw(); });
       el.querySelectorAll('tr[data-k]').forEach(tr => tr.onclick = () => {
@@ -164,21 +160,21 @@
       if (!keys.length) return '<div class="st-empty">해당하는 재고가 없습니다</div>';
       const label = { region: '지역', group: 'POS그룹', store: 'POS닉네임' }[childLevel];
       const row = (k, a, cls = '') => `<tr class="${cls}" ${cls.includes('tot') ? '' : `data-k="${esc(k)}" data-name="${esc(names.get(k))}"`}>
-        <td>${esc(childLevel === 'store' && !cls.includes('tot') ? names.get(k) : k)}${a.incIn ? `<small>이관입고 +${n(a.incIn)}</small>` : ''}
+        <td>${esc(childLevel === 'store' && !cls.includes('tot') ? names.get(k) : k)}${(a.out || a.in) ? `<small>원래 ${n(a.base0)}${a.out ? ` · 이관출고 −${n(a.out)}` : ''}${a.in ? ` · 이관입고 +${n(a.in)}` : ''}</small>` : ''}
           <div class="st-bar"><i style="width:${pct(a)}%"></i></div></td>
-        <td>${n(a.base)}</td><td class="done">${n(a.done)}</td><td class="gone">${n(a.sold + a.moved)}</td><td class="todo">${n(a.todo + a.incTodo)}</td><td>${pct(a)}%</td></tr>`;
+        <td>${n(a.base)}</td><td class="done">${n(a.done)}</td><td class="gone">${n(a.sold)}</td><td class="todo">${n(a.todo)}</td><td>${pct(a)}%</td></tr>`;
       const tot = sum(keys.map(k => map.get(k)));
-      return `<table class="st-tbl"><thead><tr><th>${label}</th><th>기준재고</th><th>조사완료</th><th>판매(이관)</th><th>미완료</th><th>진행률</th></tr></thead><tbody>
+      return `<table class="st-tbl"><thead><tr><th>${label}</th><th>기준재고</th><th>입력완료</th><th>개통완료</th><th>미완료</th><th>진행률</th></tr></thead><tbody>
         ${row('합계', tot, 'tot')}
         ${keys.map(k => row(k, map.get(k), 'go' + (highlight && (k === highlight) ? ' me' : ''))).join('')}
       </tbody></table>
-      <div class="st-note">· 판매(이관): 기준재고에 있었는데 현재재고에 없거나(판매) 다른 판매점으로 옮겨진(이관) 건<br>
-      · 이관입고 +N: 다른 판매점에서 옮겨 온 건 — 미완료에 포함되어 이 판매점에서 조사합니다<br>· 행을 누르면 하위 목록으로 이동합니다</div>`;
+      <div class="st-note">· 기준재고: 이관을 반영한 조정 수량 (다른 판매점으로 옮겨진 미조사 단말은 옮겨 간 곳에서 조사)<br>
+      · 개통완료: 기준재고에 있었는데 현재재고에 없는 단말 · 진행률 = (입력완료+개통완료) ÷ 기준재고<br>· 행을 누르면 하위 목록으로 이동합니다</div>`;
     };
     const listHtml = sid => {
       const rows = todoList(res, sid);
       const a = aggregate(res, 'store', r => storeId(r) === sid).map.get(sid) || empty();
-      const head = `<div class="st-note" style="margin:0 0 8px">기준재고 ${n(a.base)} · 조사완료 <b style="color:#22c55e">${n(a.done)}</b> · 판매(이관) ${n(a.sold + a.moved)} · <b style="color:#f59e0b">미완료 ${n(rows.length)}</b></div>`;
+      const head = `<div class="st-note" style="margin:0 0 8px">기준재고 ${n(a.base)}${(a.out || a.in) ? ` (원래 ${n(a.base0)}${a.out ? ' −' + n(a.out) : ''}${a.in ? ' +' + n(a.in) : ''})` : ''} · 입력완료 <b style="color:#22c55e">${n(a.done)}</b> · 개통완료 ${n(a.sold)} · <b style="color:#f59e0b">미완료 ${n(rows.length)}</b></div>`;
       if (!rows.length) return head + '<div class="st-empty">조사 미완료 재고가 없습니다</div>';
       rows.sort((x, y) => x.r.model.localeCompare(y.r.model) || canon(x.r.serial).localeCompare(canon(y.r.serial)));
       return head + `<table class="st-tbl st-list"><thead><tr><th>POS닉네임</th><th>단말모델</th><th>일련번호</th><th>색상</th></tr></thead><tbody>
