@@ -55,7 +55,8 @@
   #report table{width:100%;border-collapse:collapse;font-size:12.5px;margin-bottom:18px;border:2px solid #000}
   #report th,#report td{border:1px solid #999;padding:2px 4px;text-align:center;height:19px}
   #report th{background:#f2f2f2;color:#000;position:static;font-weight:700;border-bottom:2px solid #000;line-height:1.25}
-  #report td.n{text-align:right;padding-right:10px}
+  #report td.n{text-align:right;padding-right:8px}
+  #report td.adj{background:#f7f7f7;font-weight:700}
   #report .red{color:#e00;font-weight:700}
   #report tr.tot td{background:#fff2cc;font-weight:800;border-top:2px solid #000}
   #report tr.sep td{border-top:2px solid #000}
@@ -172,10 +173,10 @@
   </div>
 </main>
 
-<script src="config.js?v=20261109e"></script>
-<script src="appwrite.js?v=20261109e"></script>
-<script src="stock.js?v=20261109e"></script>
-<script src="stats.js?v=20261109e"></script>
+<script src="config.js?v=20261109f"></script>
+<script src="appwrite.js?v=20261109f"></script>
+<script src="stock.js?v=20261109f"></script>
+<script src="stats.js?v=20261109f"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script>
 const $ = id => document.getElementById(id);
@@ -407,15 +408,16 @@ $('btnDlInput').onclick = () => {
 };
 
 // 전체 다운로드: 기준재고 기준 + 조사완료여부 + 입력판매점 + 상태
-const STATUS_LABEL = { done: '조사완료', sold: '판매완료', moved: '이관완료', todo: '조사미완료' };
+const STATUS_LABEL = { done: '입력완료', sold: '개통완료', todo: '미완료' };
 async function downloadAll(msgEl) {
   if (!baseRows) return alert('기준재고를 먼저 업로드하세요');
   const res = statRes || Stats.compute(baseRows, curRows, entries);
   const out = res.items.map(it => [it.b.model, it.b.serial, it.b.price || 0, it.status === 'done' ? 'Y' : 'N', it.sv ? it.sv.store : '',
-    STATUS_LABEL[it.status], Stats.regionOf(it.b.group), it.b.group, it.b.nick, it.c ? it.c.nick : (res.hasCur ? '(현재재고 없음)' : '')]);
-  saveXlsx(out, ['모델명', '일련번호', '출고가', '조사완료여부', '입력판매점', '상태', '지역', 'POS그룹명', 'POS닉네임', '현재 POS닉네임'], `재고조사_전체_${today()}.xlsx`);
+    STATUS_LABEL[it.status], it.moved ? 'Y' : '', Stats.regionOf(it.b.group), it.b.group, it.b.nick, it.c ? it.c.nick : (res.hasCur ? '(현재재고 없음)' : ''),
+    Stats.regionOf(it.owner.group), it.owner.group, it.owner.nick]);
+  saveXlsx(out, ['모델명', '일련번호', '출고가', '조사완료여부', '입력판매점', '상태', '이관여부', '지역', 'POS그룹명', 'POS닉네임', '현재 POS닉네임', '집계 지역', '집계 POS그룹명', '집계 POS닉네임'], `재고조사_전체_${today()}.xlsx`);
   const c = {}; res.items.forEach(i => c[i.status] = (c[i.status] || 0) + 1);
-  if (msgEl) $(msgEl).innerHTML = `<span class="ok">전체 ${res.items.length.toLocaleString()}건 · 조사완료 ${(c.done || 0).toLocaleString()} · 판매 ${(c.sold || 0).toLocaleString()} · 이관 ${(c.moved || 0).toLocaleString()} · 미완료 ${(c.todo || 0).toLocaleString()}</span>`;
+  if (msgEl) $(msgEl).innerHTML = `<span class="ok">전체 ${res.items.length.toLocaleString()}건 · 입력완료 ${(c.done || 0).toLocaleString()} · 개통완료 ${(c.sold || 0).toLocaleString()} · 이관 ${res.items.filter(i => i.moved).length.toLocaleString()} · 미완료 ${(c.todo || 0).toLocaleString()}</span>`;
 }
 $('btnDlAll').onclick = () => downloadAll('svMsg');
 $('btnDlAll2').onclick = () => downloadAll(null);
@@ -423,12 +425,12 @@ $('btnDlAll2').onclick = () => downloadAll(null);
 // 통계 다운로드: 지역별 / POS그룹별 / 판매점별 시트
 $('btnDlStats').onclick = () => {
   if (!statRes) return alert('기준재고를 먼저 업로드하세요');
-  const hd = ['기준재고', '조사완료', '판매', '이관', '판매(이관) 합계', '조사미완료', '이관입고(+)', '진행률'];
-  const line = a => { const t = a.done + a.todo + a.incTodo; return [a.base, a.done, a.sold, a.moved, a.sold + a.moved, a.todo + a.incTodo, a.incIn, t ? Math.round(a.done / t * 100) + '%' : '-']; };
+  const hd = ['기준재고', '이관출고', '이관입고', '조정재고', '입력완료', '개통완료', '조사완료합계', '미완료', '진행율'];
+  const line = a => [a.base0, a.out, a.in, a.base, a.done, a.sold, a.done + a.sold, a.todo, a.base ? Math.round((a.done + a.sold) / a.base * 1000) / 10 + '%' : '-'];
   const reg = Stats.aggregate(statRes, 'region').map;
   const grp = Stats.aggregate(statRes, 'group');
   const sto = Stats.aggregate(statRes, 'store');
-  const storeInfo = new Map(); for (const it of statRes.items) storeInfo.set(Stats.storeId(it.b), it.b); for (const x of statRes.incoming) if (!storeInfo.has(Stats.storeId(x.c))) storeInfo.set(Stats.storeId(x.c), x.c);
+  const storeInfo = new Map(); for (const it of statRes.items) { storeInfo.set(Stats.storeId(it.b), it.b); if (!storeInfo.has(Stats.storeId(it.owner))) storeInfo.set(Stats.storeId(it.owner), it.owner); }
   saveXlsx(null, null, `재고조사_통계_${today()}.xlsx`, [
     ['지역별', ['지역', ...hd], Stats.REGIONS.filter(r => reg.has(r)).map(r => [r, ...line(reg.get(r))])],
     ['POS그룹별', ['지역', 'POS그룹명', ...hd], [...grp.map].sort((a, b) => Stats.REGIONS.indexOf(Stats.regionOf(a[0])) - Stats.REGIONS.indexOf(Stats.regionOf(b[0])) || b[1].base - a[1].base).map(([g, a]) => [Stats.regionOf(g), g, ...line(a)])],
@@ -438,8 +440,9 @@ $('btnDlStats').onclick = () => {
 };
 
 // ================= 현황 보고서 =================
-// 컬럼: 기준재고 / 입력완료(조사입력) / 수기조사 / 개통완료(현재재고에 없음=판매) / 이관(현재재고상 다른 판매점·영업사원) / 조사완료합계 / 미완료 / 진행율
-const RP_HEAD = ['기준재고', '입력완료', '수기조사', '개통완료', '이관', '조사완료\n합계', '미완료', '진행율'];
+// 컬럼: 기준재고(원래) / 이관출고 / 이관입고 / 조정재고(=기준−출고+입고) / 입력완료 / 개통완료(현재재고에 없음) / 조사완료합계 / 미완료 / 진행율
+const RP_HEAD = ['기준재고', '이관\n출고', '이관\n입고', '조정\n재고', '입력완료', '개통완료', '조사완료\n합계', '미완료', '진행율'];
+const NC = RP_HEAD.length;   // 숫자 컬럼 수 (마지막은 진행율)
 (function initReport() {
   const d = new Date(), q = Math.floor(d.getMonth() / 3) + 1, p2 = n => String(n).padStart(2, '0');
   $('rpTitle').value = `${d.getFullYear()}년 ${q}분기 대리점 전체 재고조사 현황`;
@@ -448,14 +451,14 @@ const RP_HEAD = ['기준재고', '입력완료', '수기조사', '개통완료',
 })();
 function reportData() {
   if (!statRes) return null;
-  const line = a => { const total = a.done + a.sold + a.moved; return [a.base, a.done, 0, a.sold, a.moved, total, a.todo, a.base ? total / a.base : 0]; };
+  const line = a => { const total = a.done + a.sold; return [a.base0, a.out, a.in, a.base, a.done, a.sold, total, a.todo, a.base ? total / a.base : 0]; };
   const reg = Stats.aggregate(statRes, 'region').map;
   const grp = Stats.aggregate(statRes, 'group').map;
   const regions = Stats.REGIONS.filter(r => reg.has(r)).map(r => [r, ...line(reg.get(r))]);
   const order = new Map(); Stats.REGION_DEF.forEach(([, ms], ri) => ms.forEach((m, mi) => order.set(m, ri * 100 + mi)));
   const groups = [...grp].map(([g, a]) => [Stats.regionOf(g), g, ...line(a)])
     .sort((x, y) => Stats.REGIONS.indexOf(x[0]) - Stats.REGIONS.indexOf(y[0]) || (order.get(x[1]) ?? 9999) - (order.get(y[1]) ?? 9999) || y[2] - x[2]);
-  const t = [...reg.values()].reduce((s, a) => { for (const k in s) s[k] += a[k]; return s; }, { base: 0, done: 0, sold: 0, moved: 0, todo: 0, incIn: 0, incTodo: 0 });
+  const t = [...reg.values()].reduce((s, a) => { for (const k in s) s[k] += a[k]; return s; }, { base0: 0, out: 0, in: 0, base: 0, done: 0, sold: 0, todo: 0 });
   return { regions, groups, total: ['대리점 합계', ...line(t)] };
 }
 const fmtN = v => (v || 0).toLocaleString();
@@ -464,15 +467,15 @@ function renderReport() {
   const D = reportData();
   if (!D) { $('report').innerHTML = '<div style="padding:40px;text-align:center;color:#666">기준재고를 업로드하면 보고서가 만들어집니다</div>'; return; }
   const head = first => `<tr>${first.map(h => `<th>${h}</th>`).join('')}${RP_HEAD.map(h => `<th>${h.replace('\n', '<br>')}</th>`).join('')}</tr>`;
-  const cells = (v, redTodo, redPct) => `<td class="n">${fmtN(v[0])}</td><td class="n">${fmtN(v[1])}</td><td class="n">${fmtN(v[2])}</td><td class="n">${fmtN(v[3])}</td><td class="n">${fmtN(v[4])}</td><td class="n">${fmtN(v[5])}</td><td class="n${redTodo ? ' red' : ''}">${fmtN(v[6])}</td><td class="${redPct ? 'red' : ''}">${fmtP(v[7])}</td>`;
+  const cells = (v, redTodo, redPct) => v.slice(0, NC - 1).map((x, i) => `<td class="n${i === NC - 2 && redTodo ? ' red' : ''}${i === 3 ? ' adj' : ''}">${fmtN(x)}</td>`).join('') + `<td class="${redPct ? 'red' : ''}">${fmtP(v[NC - 1])}</td>`;
   let prev = null;
   $('report').innerHTML = `<h1>■□ ${esc($('rpTitle').value)} □■</h1><div class="rule"></div>
     <div class="meta">${$('rpPeriod').value ? '시행일 : ' + esc($('rpPeriod').value) + '<br>' : ''}기준일 : ${esc($('rpDate').value)} 기준</div>
-    <table><colgroup><col style="width:21%"><col span="7"><col style="width:9%"></colgroup>
+    <table><colgroup><col style="width:16%"><col span="8"><col style="width:8%"></colgroup>
       <thead>${head(['그룹'])}</thead><tbody>
       ${D.regions.map(r => `<tr><td>${esc(r[0])}</td>${cells(r.slice(1), true, false)}</tr>`).join('')}
       <tr class="tot"><td>${D.total[0]}</td>${cells(D.total.slice(1), true, false)}</tr></tbody></table>
-    <table><colgroup><col style="width:9%"><col style="width:12%"><col span="7"><col style="width:9%"></colgroup>
+    <table><colgroup><col style="width:8%"><col style="width:11%"><col span="8"><col style="width:8%"></colgroup>
       <thead>${head(['그룹', '담당구분'])}</thead><tbody>
       ${D.groups.map(g => { const sep = prev !== null && prev !== g[0]; prev = g[0];
         return `<tr class="${sep ? 'sep' : ''}"><td>${esc(g[0])}</td><td style="font-size:${g[1].length > 6 ? 10.5 : 12.5}px">${esc(g[1])}</td>${cells(g.slice(2), false, true)}</tr>`; }).join('')}
@@ -524,19 +527,20 @@ $('btnRpXlsx').onclick = async () => {
     const wb = new ExcelJS.Workbook(), ws = wb.addWorksheet('재고조사현황', {
       pageSetup: { paperSize: 9, orientation: 'portrait', fitToPage: true, fitToWidth: 1, fitToHeight: 1, horizontalCentered: true,
                    margins: { left: 0.3, right: 0.3, top: 0.4, bottom: 0.4, header: 0.2, footer: 0.2 } } });
-    ws.columns = [{ width: 9 }, { width: 13 }, ...Array(7).fill({ width: 10 }), { width: 9 }];
+    const LC = 2 + NC;   // 마지막 컬럼 번호
+    ws.columns = [{ width: 9 }, { width: 13 }, ...Array(NC - 1).fill({ width: 9 }), { width: 8 }];
     const F = 'Malgun Gothic', thin = { style: 'thin', color: { argb: 'FF999999' } }, thick = { style: 'medium', color: { argb: 'FF000000' } };
     const box = c => c.border = { top: thin, bottom: thin, left: thin, right: thin };
     const put = (r, c, v, st = {}) => { const cell = ws.getCell(r, c); cell.value = v; cell.font = { name: F, size: 10, ...(st.font || {}) }; cell.alignment = { vertical: 'middle', horizontal: st.h || 'center', wrapText: true }; if (st.fill) cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: st.fill } }; if (st.fmt) cell.numFmt = st.fmt; box(cell); return cell; };
-    const outline = (r1, r2, c1 = 1, c2 = 10) => { for (let r = r1; r <= r2; r++) for (let c = c1; c <= c2; c++) { const b = { ...ws.getCell(r, c).border }; if (r === r1) b.top = thick; if (r === r2) b.bottom = thick; if (c === c1) b.left = thick; if (c === c2) b.right = thick; ws.getCell(r, c).border = b; } };
-    ws.mergeCells('A1:J1'); const t = ws.getCell('A1'); t.value = `■□ ${$('rpTitle').value} □■`; t.font = { name: F, size: 16, bold: true }; t.alignment = { horizontal: 'center', vertical: 'middle' }; ws.getRow(1).height = 32;
-    for (let c = 1; c <= 10; c++) ws.getCell(1, c).border = { bottom: { style: 'double', color: { argb: 'FF000000' } } };
+    const outline = (r1, r2, c1 = 1, c2 = LC) => { for (let r = r1; r <= r2; r++) for (let c = c1; c <= c2; c++) { const b = { ...ws.getCell(r, c).border }; if (r === r1) b.top = thick; if (r === r2) b.bottom = thick; if (c === c1) b.left = thick; if (c === c2) b.right = thick; ws.getCell(r, c).border = b; } };
+    ws.mergeCells(1, 1, 1, LC); const t = ws.getCell('A1'); t.value = `■□ ${$('rpTitle').value} □■`; t.font = { name: F, size: 16, bold: true }; t.alignment = { horizontal: 'center', vertical: 'middle' }; ws.getRow(1).height = 32;
+    for (let c = 1; c <= LC; c++) ws.getCell(1, c).border = { bottom: { style: 'double', color: { argb: 'FF000000' } } };
     let r = 2;
-    if ($('rpPeriod').value) { ws.mergeCells(r, 6, r, 10); Object.assign(ws.getCell(r, 6), { value: '시행일 : ' + $('rpPeriod').value }); ws.getCell(r, 6).font = { name: F, size: 10 }; ws.getCell(r, 6).alignment = { horizontal: 'right' }; r++; }
-    ws.mergeCells(r, 6, r, 10); ws.getCell(r, 6).value = `기준일 : ${$('rpDate').value} 기준`; ws.getCell(r, 6).font = { name: F, size: 10 }; ws.getCell(r, 6).alignment = { horizontal: 'right' }; r += 2;
+    if ($('rpPeriod').value) { ws.mergeCells(r, LC - 4, r, LC); ws.getCell(r, LC - 4).value = '시행일 : ' + $('rpPeriod').value; ws.getCell(r, LC - 4).font = { name: F, size: 10 }; ws.getCell(r, LC - 4).alignment = { horizontal: 'right' }; r++; }
+    ws.mergeCells(r, LC - 4, r, LC); ws.getCell(r, LC - 4).value = `기준일 : ${$('rpDate').value} 기준`; ws.getCell(r, LC - 4).font = { name: F, size: 10 }; ws.getCell(r, LC - 4).alignment = { horizontal: 'right' }; r += 2;
     const nums = (row, v, redTodo, redPct, st = {}) => {
-      v.slice(0, 7).forEach((x, i) => put(row, 3 + i, x, { ...st, h: 'right', fmt: '#,##0', font: { ...(st.font || {}), ...(i === 6 && redTodo ? { color: { argb: 'FFEE0000' }, bold: true } : {}) } }));
-      put(row, 10, v[7], { ...st, fmt: '0.0%', font: { ...(st.font || {}), ...(redPct ? { color: { argb: 'FFEE0000' }, bold: true } : {}) } });
+      v.slice(0, NC - 1).forEach((x, i) => put(row, 3 + i, x, { ...st, h: 'right', fmt: '#,##0', font: { ...(st.font || {}), ...(i === NC - 2 && redTodo ? { color: { argb: 'FFEE0000' }, bold: true } : {}) } }));
+      put(row, LC, v[NC - 1], { ...st, fmt: '0.0%', font: { ...(st.font || {}), ...(redPct ? { color: { argb: 'FFEE0000' }, bold: true } : {}) } });
     };
     const header = (row, first) => {
       if (first.length === 1) { ws.mergeCells(row, 1, row, 2); put(row, 1, first[0], { fill: 'FFF2F2F2', font: { bold: true } }); }
@@ -553,14 +557,15 @@ $('btnRpXlsx').onclick = async () => {
     const s2 = r; header(r++, ['그룹', '담당구분']); let prev = null;
     for (const g of D.groups) {
       put(r, 1, g[0]); put(r, 2, g[1], { font: { size: g[1].length > 6 ? 8 : 10 } }); nums(r, g.slice(2), false, true);
-      if (prev !== null && prev !== g[0]) for (let c = 1; c <= 10; c++) ws.getCell(r, c).border = { ...ws.getCell(r, c).border, top: thick };
+      if (prev !== null && prev !== g[0]) for (let c = 1; c <= LC; c++) ws.getCell(r, c).border = { ...ws.getCell(r, c).border, top: thick };
       prev = g[0]; r++;
     }
     outline(s2, r - 1); r += 1;
     // 결재란
-    ws.mergeCells(r, 5, r + 1, 5); put(r, 5, '결\n재', { font: { bold: true, size: 13 } });
-    ['담당', '대표', '점검', '확인', '확정'].forEach((h, i) => { put(r, 6 + i, h, { font: { bold: true, size: 12 } }); put(r + 1, 6 + i, ''); });
-    ws.getRow(r).height = 26; ws.getRow(r + 1).height = 60; outline(r, r + 1, 5, 10);
+    const S0 = LC - 5;
+    ws.mergeCells(r, S0, r + 1, S0); put(r, S0, '결\n재', { font: { bold: true, size: 13 } });
+    ['담당', '대표', '점검', '확인', '확정'].forEach((h, i) => { put(r, S0 + 1 + i, h, { font: { bold: true, size: 12 } }); put(r + 1, S0 + 1 + i, ''); });
+    ws.getRow(r).height = 26; ws.getRow(r + 1).height = 60; outline(r, r + 1, S0, LC);
     saveBlob(new Blob([await wb.xlsx.writeBuffer()], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), rpName('xlsx'));
     $('rpMsg').textContent = '';
   } catch (e) { $('rpMsg').innerHTML = `<span class="bad">${esc(e.message)}</span>`; }
