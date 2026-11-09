@@ -149,7 +149,7 @@
       el.querySelectorAll('tr[data-k]').forEach(tr => tr.onclick = () => {
         const next = { all: 'region', region: 'group', group: 'store' }[cur.level];
         path = path.concat({ level: next, v: tr.dataset.k, name: tr.dataset.name });
-        draw(); el.scrollIntoView({ block: 'start', behavior: 'smooth' });
+        draw(); if (opts.scroller) opts.scroller.scrollTop = 0; else el.scrollIntoView({ block: 'start', behavior: 'smooth' });
       });
     };
     const tableHtml = cur => {
