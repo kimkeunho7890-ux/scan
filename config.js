@@ -13,6 +13,7 @@ window.APP_CONFIG = {
   basePubFileId:  'base_pub',     // 기준재고 (POS코드, POS그룹명, POS닉네임, 단말모델, 일련번호, 단말색상)
   curPubFileId:   'current_pub',  // 현재재고 (같은 컬럼)
   storesFileId:   'stores',       // P코드, 판매점명 (자동완성)
+  settingsFileId: 'settings',     // 재고조사 ON/OFF (관리자 화면에서 설정)
 
   // 조사 결과 저장
   databaseId:   'scan',
