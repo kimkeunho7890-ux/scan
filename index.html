@@ -91,7 +91,7 @@
   .chip{border-radius:999px;padding:10px 22px;font-size:15px;font-weight:700;background:transparent;border:1.5px solid var(--line);color:var(--sub)}
   .chip.on{background:var(--acc);border-color:var(--acc);color:#04261b}
   .entryBox{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px}
-  .entryBox .go{width:100%;margin-top:10px;background:var(--acc);border-color:var(--acc);color:#04261b;font-size:16px}
+  .entryBox .go,#closedView .go{width:100%;margin-top:10px;background:var(--acc);border-color:var(--acc);color:#04261b;font-size:16px}
   #recentPick{margin-top:14px;text-align:center;font-size:13px;color:var(--sub)}
   #recentPick a{color:var(--acc);cursor:pointer;font-weight:700}
   .who{display:flex;align-items:center;gap:8px;min-width:0}
@@ -102,10 +102,22 @@
   header a.chg{color:var(--sub);font-size:13px;cursor:pointer;white-space:nowrap;margin-left:8px}
   .toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom));transform:translateX(-50%);background:#111;border:1px solid var(--line);padding:10px 16px;border-radius:10px;font-size:14px;z-index:99;opacity:0;transition:opacity .2s;pointer-events:none;max-width:90vw;text-align:center}
   .toast.show{opacity:1}
+  #closedView{max-width:420px;margin:0 auto;padding:60px 20px;text-align:center}
+  #closedView .logo{width:72px;height:72px;border-radius:18px}
+  #closedView h1{font-size:22px;margin:14px 0 18px}
+  .closedBox{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:22px 16px;display:grid;gap:10px;font-size:14px;color:var(--sub);line-height:1.6}
+  .closedBox b{font-size:17px;color:var(--warn)}
 </style>
 </head>
 <body>
 <div id="installBar"><button id="btnInstall">실물 재고조사 앱 설치 (바로가기)</button></div>
+<!-- 조사 기간 아님 -->
+<div id="closedView" class="hidden">
+  <img class="logo" src="icon-192.png" alt="">
+  <h1>실물 재고조사</h1>
+  <div class="closedBox"><b>지금은 재고조사 기간이 아닙니다</b><span id="closedMsg">조사 기간에만 접속할 수 있습니다.<br>기간이 시작되면 다시 열어주세요.</span></div>
+  <button class="go" id="btnClosedRe" style="margin-top:14px">다시 확인</button>
+</div>
 <!-- 진입 화면 -->
 <div id="entryView">
   <img class="logo" src="icon-192.png" alt="">
@@ -130,7 +142,7 @@
   </div>
   <div id="recentPick" class="hidden"></div>
   <div class="info" style="justify-content:center"><span id="dataInfo">판매점·재고 목록 불러오는 중...</span><a id="btnReload">새로고침</a></div>
-  <div class="ver">버전 20261110d</div>
+  <div class="ver">버전 20261110e</div>
 </div>
 
 <!-- 조사 화면 -->
@@ -176,10 +188,10 @@
 </div></div>
 <div class="toast" id="toast"></div>
 
-<script src="config.js?v=20261110d"></script>
-<script src="appwrite.js?v=20261110d"></script>
-<script src="stock.js?v=20261110d"></script>
-<script src="stats.js?v=20261110d"></script>
+<script src="config.js?v=20261110e"></script>
+<script src="appwrite.js?v=20261110e"></script>
+<script src="stock.js?v=20261110e"></script>
+<script src="stats.js?v=20261110e"></script>
 <script type="module">
 const $ = id => document.getElementById(id);
 const C = window.APP_CONFIG;
@@ -214,7 +226,27 @@ let baseRows = null, curRows = null;   // 기준재고 / 현재재고 (조사현
 let picked = null;         // {code, name}
 
 function parseTable(text) { return Stock.parseCSV(String(text).replace(/^﻿/, '')); }
+// ---- 재고조사 ON/OFF (관리자 화면에서 설정, 공개 버킷 settings 파일) ----
+async function surveyOpen() {
+  try {
+    const t = parseTable(await AW.fileText(C.publicBucketId, C.settingsFileId));
+    const m = new Map(t.map(r => [String(r[0]).trim(), String(r[1] ?? '').trim()]));
+    return { open: m.get('survey') !== 'off', msg: m.get('message') || '' };
+  } catch (e) { return { open: true, msg: '' }; }      // 설정 파일이 없으면 열림
+}
+async function checkOpen() {
+  const st = await surveyOpen();
+  $('closedView').classList.toggle('hidden', st.open);
+  if (!st.open) {
+    ['entryView', 'scanView', 'statView', 'installBar'].forEach(id => $(id) && $(id).classList.add('hidden'));
+    if (scanning) stopCam(false);
+    if (st.msg) $('closedMsg').textContent = st.msg;
+  }
+  return st.open;
+}
+$('btnClosedRe').onclick = async () => { if (await checkOpen()) location.reload(); };
 async function loadData() {
+  if (!(await checkOpen())) return;
   $('dataInfo').textContent = '판매점·재고 목록 불러오는 중...';
   const msgs = [];
   try {
@@ -353,7 +385,7 @@ async function openStats() {
     if (mine) {
       const pc = Math.round(Stats.rate(mine) * 100);
       $('stSum').innerHTML = `<div><b>${mine.base.toLocaleString()}</b>기준재고${(mine.out || mine.in) ? `<br><span style="font-size:10px">원래 ${mine.base0}${mine.out ? ' −' + mine.out : ''}${mine.in ? ' +' + mine.in : ''}</span>` : ''}</div><div><b style="color:var(--ok)">${mine.done.toLocaleString()}</b>입력완료</div>` +
-        `<div><b style="color:var(--sub)">${mine.sold.toLocaleString()}</b>개통완료</div><div><b style="color:var(--warn)">${mine.todo.toLocaleString()}</b>미완료 · ${pc}%</div>`;
+        `<div><b style="color:#60a5fa">${mine.sold.toLocaleString()}</b>개통완료</div><div><b style="color:var(--warn)">${mine.todo.toLocaleString()}</b>미완료 · ${pc}%</div>`;
     }
   } catch (e) {
     $('stBody').innerHTML = `<span class="empty">불러오기 실패: ${esc(e.message)}</span>` + (e.code === 401 ? '<br><span class="empty">surveys 컬렉션 읽기 권한(Any)을 확인하세요</span>' : '');
@@ -637,17 +669,26 @@ $('btnSend').onclick = async () => {
   if (!list.length) return;
   if (!confirm(`${picked.name} (${picked.code})\n${list.length}건을 전송할까요?`)) return;
   $('btnSend').disabled = true; setStatus('전송 중...');
+  if (!(await checkOpen())) { alert('재고조사 기간이 종료되어 전송할 수 없습니다.\n(목록은 이 기기에 남아 있습니다)'); return; }
+  // 많이 찍은 경우 100건씩 나눠 전송 (한 번에 너무 길면 서버 저장 한도에 걸림)
+  const CHUNK = 100, total = list.length; let sent = 0;
   try {
-    await AW.createDoc(C.databaseId, C.surveyCollectionId, {
-      pcode: picked.code, store: picked.name, count: list.length,
-      items: JSON.stringify(list.map(x => ({ m: x.model, s: x.serial, r: x.serialRaw, k: x.matched ? 1 : 0 })))
-    });
-    beep(2400); toast(`${list.length}건 전송 완료`);
-    setStatus(`${picked.name} · ${list.length}건 전송 완료`);
-    list = []; saveDraft(); renderList();
+    while (list.length) {
+      const part = list.slice(0, CHUNK);
+      await AW.createDoc(C.databaseId, C.surveyCollectionId, {
+        pcode: picked.code, store: picked.name, count: part.length,
+        items: JSON.stringify(part.map(x => ({ m: x.model, s: x.serial, r: x.serialRaw, k: x.matched ? 1 : 0 })))
+      });
+      list.splice(0, part.length); sent += part.length; saveDraft();
+      if (list.length) setStatus(`전송 중... ${sent}/${total}`);
+    }
+    beep(2400); toast(`${total}건 전송 완료`);
+    setStatus(`${picked.name} · ${total}건 전송 완료`);
+    renderList();
   } catch (e) {
-    alert('전송 실패: ' + e.message + '\n(목록은 그대로 남아 있으니 다시 [입력완료]를 누르세요)');
-    setStatus('전송 실패');
+    renderList();
+    alert('전송 실패: ' + e.message + (sent ? `\n(${sent}건은 전송됐고, 남은 ${list.length}건은 목록에 그대로 있습니다)` : '\n(목록은 그대로 남아 있으니 다시 [입력완료]를 누르세요)'));
+    setStatus(sent ? `${sent}건 전송 · ${list.length}건 남음` : '전송 실패');
   } finally { updateSend(); }
 };
 $('btnClear').onclick = () => {
