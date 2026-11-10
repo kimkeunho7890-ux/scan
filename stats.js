@@ -101,6 +101,12 @@
       .map(it => { const mv = it.owner !== it.b; return { r: it.c || it.b, tag: mv ? '이관입고' : '', from: mv ? `${it.b.nick}${it.b.group !== it.owner.group ? ' / ' + it.b.group : ''}` : '' }; });
   }
 
+  // 판매점별 전체 목록: 그 판매점으로 집계되는 모든 단말 (입력완료·개통완료·분실·미완료)
+  function storeList(res, sid, group) {
+    return res.items.filter(it => storeId(it.owner) === sid && (group == null || (it.owner.group || '(미지정)') === group))
+      .map(it => { const mv = it.owner !== it.b && it.status === 'todo'; return { r: it.c || it.b, status: it.status, sv: it.sv, tag: mv ? '이관입고' : '', from: mv ? `${it.b.nick}${it.b.group !== it.owner.group ? ' / ' + it.b.group : ''}` : '' }; });
+  }
+
   // ---------- 드릴다운 화면 ----------
   const css = `
   .st-crumb{font-size:13px;color:#9aa3b2;margin:2px 0 10px;display:flex;flex-wrap:wrap;gap:4px;align-items:center}
@@ -120,13 +126,23 @@
   .st-list .mono{font-family:ui-monospace,Menlo,Consolas,monospace}
   .st-tag{display:inline-block;font-size:10px;padding:1px 6px;border-radius:6px;background:rgba(59,130,246,.18);color:#60a5fa;margin-left:4px}
   .st-note{font-size:12px;color:#9aa3b2;margin-top:8px;line-height:1.5}
-  .st-empty{color:#9aa3b2;padding:14px 0;text-align:center}`;
+  .st-empty{color:#9aa3b2;padding:14px 0;text-align:center}
+  .st-flt{display:flex;gap:6px;margin:0 0 8px}
+  .st-flt button{flex:1;background:transparent;border:1px solid #2a2f3a;color:#9aa3b2;border-radius:999px;padding:8px 10px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit}
+  .st-flt button.on{background:#f59e0b;border-color:#f59e0b;color:#1a1200}
+  .st-flt button.on.all{background:#3b82f6;border-color:#3b82f6;color:#fff}
+  .st-st{display:inline-block;font-size:11px;font-weight:700;padding:2px 7px;border-radius:999px;white-space:nowrap}
+  .st-st.done{background:rgba(34,197,94,.18);color:#4ade80}.st-st.sold{background:rgba(148,163,184,.18);color:#cbd5e1}
+  .st-st.lost{background:rgba(239,68,68,.2);color:#f87171}.st-st.todo{background:rgba(245,158,11,.2);color:#fbbf24}
+  .st-list tr.dim td{opacity:.75}`;
   function injectCss() { if (document.getElementById('st-css')) return; const s = document.createElement('style'); s.id = 'st-css'; s.textContent = css; document.head.appendChild(s); }
   const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const n = v => (v || 0).toLocaleString();
   // 삼성은 라벨처럼 7자리로 표시 (엑셀에서 빠진 앞자리 0 복원)
   const showSerial = r => /^SM-/i.test(r.model) && /^\d{1,6}$/.test(r.serial) ? r.serial.padStart(7, '0') : r.serial;
-  const pct = a => a.base ? Math.round((a.done + a.sold) / a.base * 100) : 0;   // 진행률 = (입력완료+개통완료) / 조정 기준재고
+  // 진행률 = 조사완료합계(입력완료+개통완료) ÷ (조정재고 − 분실)  → 분실은 확인된 건이라 분모에서 빼서 최대 100%
+  const rate = a => { const d = (a.base || 0) - (a.lost || 0); return d > 0 ? (a.done + a.sold) / d : (a.base ? 1 : 0); };
+  const pct = a => Math.round(rate(a) * 100);
 
   // path: [{level:'all'}, {level:'region', v}, {level:'group', v}, {level:'store', v, name}]
   function mount(el, res, opts = {}) {
@@ -134,6 +150,7 @@
     const minDepth = opts.minDepth || 0;      // 이보다 위로는 못 올라감 (영업사원 화면)
     let path = opts.path || [{ level: 'all' }];
     const highlight = opts.highlight || '';
+    let onlyTodo = !!opts.onlyTodo;           // 판매점 목록: 미완료만 보기
     const draw = () => {
       const cur = path[path.length - 1];
       const crumb = path.map((p, i) => {
@@ -146,6 +163,7 @@
       if (!res.hasCur) html += `<div class="st-note">※ 현재재고가 등록되지 않아 개통완료·이관은 반영되지 않았습니다.</div>`;
       el.innerHTML = html;
       el.querySelectorAll('[data-up]').forEach(a => a.onclick = () => { path = path.slice(0, +a.dataset.up + 1); draw(); });
+      el.querySelectorAll('.st-flt button').forEach(b => b.onclick = () => { onlyTodo = b.dataset.f === 'todo'; draw(); });
       el.querySelectorAll('tr[data-k]').forEach(tr => tr.onclick = () => {
         const next = { all: 'region', region: 'group', group: 'store' }[cur.level];
         path = path.concat({ level: next, v: tr.dataset.k, name: tr.dataset.name });
@@ -174,21 +192,24 @@
         ${keys.map(k => row(k, map.get(k), 'go' + (highlight && (k === highlight) ? ' me' : ''))).join('')}
       </tbody></table>
       <div class="st-note">· 기준재고: 이관을 반영한 조정 수량 (다른 판매점으로 옮겨진 미조사 단말은 옮겨 간 곳에서 조사)<br>
-      · 개통완료: 기준재고에 있었는데 현재재고에 없는 단말 · 진행률 = (입력완료+개통완료) ÷ 기준재고<br>· 행을 누르면 하위 목록으로 이동합니다</div>`;
+      · 개통완료: 기준재고에 있었는데 현재재고에 없는 단말 · 진행률 = (입력완료+개통완료) ÷ (기준재고 − 분실)<br>· 행을 누르면 하위 목록으로 이동합니다</div>`;
     };
+    const ST = { todo: ['미완료', 0], lost: ['분실', 1], done: ['입력완료', 2], sold: ['개통완료', 3] };
     const listHtml = (sid, group) => {
-      const rows = todoList(res, sid, group);
+      const all = storeList(res, sid, group);
       const a = aggregate(res, 'store', r => storeId(r) === sid && (group == null || (r.group || '(미지정)') === group)).map.get(sid) || empty();
-      const head = `<div class="st-note" style="margin:0 0 8px">기준재고 ${n(a.base)}${(a.out || a.in) ? ` (원래 ${n(a.base0)}${a.out ? ' −' + n(a.out) : ''}${a.in ? ' +' + n(a.in) : ''})` : ''} · 입력완료 <b style="color:#22c55e">${n(a.done)}</b> · 개통완료 ${n(a.sold)}${a.lost ? ` · <span style="color:#f87171">분실 ${n(a.lost)}</span>` : ''} · <b style="color:#f59e0b">미완료 ${n(rows.length)}</b></div>`;
-      if (!rows.length) return head + '<div class="st-empty">조사 미완료 재고가 없습니다</div>';
-      rows.sort((x, y) => x.r.model.localeCompare(y.r.model) || canon(x.r.serial).localeCompare(canon(y.r.serial)));
-      return head + `<table class="st-tbl st-list"><thead><tr><th>POS닉네임</th><th>단말모델</th><th>일련번호</th><th>색상</th></tr></thead><tbody>
-        ${rows.map(x => `<tr><td>${esc(x.r.nick)}${x.tag ? `<span class="st-tag">${x.tag}${x.from ? ' ← ' + esc(x.from) : ''}</span>` : ''}</td><td>${esc(x.r.model)}</td><td class="mono">${esc(showSerial(x.r))}</td><td>${esc(x.r.color)}</td></tr>`).join('')}
+      const head = `<div class="st-note" style="margin:0 0 8px">기준재고 ${n(a.base)}${(a.out || a.in) ? ` (원래 ${n(a.base0)}${a.out ? ' −' + n(a.out) : ''}${a.in ? ' +' + n(a.in) : ''})` : ''} · 입력완료 <b style="color:#22c55e">${n(a.done)}</b> · 개통완료 ${n(a.sold)}${a.lost ? ` · <span style="color:#f87171">분실 ${n(a.lost)}</span>` : ''} · <b style="color:#f59e0b">미완료 ${n(a.todo)}</b></div>`;
+      const flt = `<div class="st-flt"><button data-f="all" class="all${onlyTodo ? '' : ' on'}">전체 ${n(all.length)}</button><button data-f="todo" class="${onlyTodo ? 'on' : ''}">미완료만 보기 ${n(a.todo)}</button></div>`;
+      const rows = onlyTodo ? all.filter(x => x.status === 'todo') : all;
+      if (!rows.length) return head + flt + `<div class="st-empty">${onlyTodo ? '조사 미완료 재고가 없습니다' : '해당 재고가 없습니다'}</div>`;
+      rows.sort((x, y) => ST[x.status][1] - ST[y.status][1] || x.r.model.localeCompare(y.r.model) || canon(x.r.serial).localeCompare(canon(y.r.serial)));
+      return head + flt + `<table class="st-tbl st-list"><thead><tr><th>상태</th><th>POS닉네임</th><th>단말모델</th><th>일련번호</th><th>색상</th></tr></thead><tbody>
+        ${rows.map(x => `<tr class="${x.status === 'todo' ? '' : 'dim'}"><td><span class="st-st ${x.status}">${ST[x.status][0]}</span></td><td>${esc(x.r.nick)}${x.tag ? `<span class="st-tag">${x.tag}${x.from ? ' ← ' + esc(x.from) : ''}</span>` : ''}</td><td>${esc(x.r.model)}</td><td class="mono">${esc(showSerial(x.r))}</td><td>${esc(x.r.color)}</td></tr>`).join('')}
       </tbody></table>`;
     };
     draw();
     return { setPath: p => { path = p; draw(); } };
   }
 
-  window.Stats = { REGIONS, REGION_DEF, regionOf, key, canon, storeId, entriesFromDocs, compute, aggregate, todoList, mount };
+  window.Stats = { REGIONS, REGION_DEF, regionOf, key, canon, storeId, entriesFromDocs, compute, aggregate, todoList, storeList, mount, rate };
 })();
