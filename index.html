@@ -21,6 +21,7 @@
   #installBar{display:none;padding:10px 16px;background:#047857}
   #installBar button{width:100%;background:#fff;color:#047857;border:0;font-size:16px;font-weight:800;padding:12px;border-radius:10px;font-family:inherit}
   label.fl{display:block;font-size:13px;color:var(--sub);margin:0 0 6px;font-weight:600}
+  input[type=password]{width:100%;background:#0f1115;color:var(--txt);border:1px solid var(--line);border-radius:10px;padding:13px;font-size:17px;font-family:inherit;margin-top:10px;letter-spacing:4px}
   input[type=search]{width:100%;background:#0f1115;color:var(--txt);border:1px solid var(--line);border-radius:10px;padding:13px;font-size:17px;font-family:inherit}
   .ac{position:relative}
   #sugg{position:absolute;left:0;right:0;top:100%;margin-top:4px;background:#111827;border:1px solid var(--line);border-radius:10px;max-height:300px;overflow:auto;z-index:20;box-shadow:0 10px 30px rgba(0,0,0,.5)}
@@ -124,11 +125,12 @@
   <div class="entryBox hidden" id="boxStaff">
     <label class="fl" for="staffName">영업사원 이름</label>
     <input type="search" id="staffName" placeholder="이름 입력" autocomplete="off">
+    <input type="password" id="staffPw" placeholder="비밀번호" inputmode="numeric" autocomplete="off" maxlength="12">
     <button class="go" id="btnStaffGo">시작</button>
   </div>
   <div id="recentPick" class="hidden"></div>
   <div class="info" style="justify-content:center"><span id="dataInfo">판매점·재고 목록 불러오는 중...</span><a id="btnReload">새로고침</a></div>
-  <div class="ver">버전 20261110b</div>
+  <div class="ver">버전 20261110d</div>
 </div>
 
 <!-- 조사 화면 -->
@@ -174,10 +176,10 @@
 </div></div>
 <div class="toast" id="toast"></div>
 
-<script src="config.js?v=20261110b"></script>
-<script src="appwrite.js?v=20261110b"></script>
-<script src="stock.js?v=20261110b"></script>
-<script src="stats.js?v=20261110b"></script>
+<script src="config.js?v=20261110d"></script>
+<script src="appwrite.js?v=20261110d"></script>
+<script src="stock.js?v=20261110d"></script>
+<script src="stats.js?v=20261110d"></script>
 <script type="module">
 const $ = id => document.getElementById(id);
 const C = window.APP_CONFIG;
@@ -279,8 +281,10 @@ function setChip(kind) {
 $('chipStore').onclick = () => setChip('store');
 $('chipStaff').onclick = () => setChip('staff');
 
+const STAFF_PW = '7777';   // 영업사원 공통 비밀번호
 function enter(p) {   // p = {kind:'store'|'staff', code, name}
   picked = p;
+  $('btnStat').classList.toggle('hidden', p.kind !== 'staff');   // 조사현황은 영업사원만
   try { localStorage.setItem('survey_pick', JSON.stringify(p)); } catch (e) {}
   $('whoKind').textContent = p.kind === 'staff' ? '영업사원' : '판매점';
   $('whoKind').classList.toggle('staff', p.kind === 'staff');
@@ -294,10 +298,13 @@ function pick(s) { if (s) enter({ kind: 'store', code: s.code, name: s.name }); 
 function staffGo() {
   const n = $('staffName').value.trim();
   if (n.length < 2) { toast('영업사원 이름을 2자 이상 입력하세요'); $('staffName').focus(); return; }
-  enter({ kind: 'staff', code: '영업사원', name: n });
+  if ($('staffPw').value.trim() !== STAFF_PW) { toast('비밀번호가 맞지 않습니다'); $('staffPw').value = ''; $('staffPw').focus(); return; }
+  $('staffPw').value = '';
+  enter({ kind: 'staff', code: '영업사원', name: n, ok: 1 });
 }
 $('btnStaffGo').onclick = staffGo;
-$('staffName').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); staffGo(); } });
+$('staffName').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); $('staffPw').focus(); } });
+$('staffPw').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); staffGo(); } });
 
 function showRecentPick() {   // 최근 조사자 바로 이어하기
   let p = null; try { p = JSON.parse(localStorage.getItem('survey_pick') || 'null'); } catch (e) {}
@@ -306,10 +313,14 @@ function showRecentPick() {   // 최근 조사자 바로 이어하기
   el.innerHTML = `최근: ${p.kind === 'staff' ? '영업사원 ' : esc(p.code) + ' '}${esc(p.name)} · <a id="btnResume">이어서 하기</a>` +
                  (list.length ? ` <span style="color:var(--warn)">(미전송 ${list.length}건)</span>` : '');
   el.classList.remove('hidden');
-  $('btnResume').onclick = () => enter(p.kind ? p : { kind: 'store', ...p });
+  $('btnResume').onclick = () => {
+    if (p.kind === 'staff' && !p.ok) { setChip('staff'); $('staffName').value = p.name; setTimeout(() => $('staffPw').focus(), 60); toast('비밀번호를 입력하세요'); return; }   // 비밀번호 확인 전 기록
+    enter(p.kind ? p : { kind: 'store', ...p });
+  };
 }
 // ================= 조사현황 =================
 async function openStats() {
+  if (!picked || picked.kind !== 'staff') return;   // 판매점은 조사현황 없음
   if (camWanted) $('btnCam').click();             // 카메라 끄기
   $('statView').classList.remove('hidden'); scrollTo(0, 0);
   $('stTitle').textContent = picked.kind === 'staff' ? `${picked.name} 조사현황` : `${picked.name} 조사현황`;
@@ -340,7 +351,7 @@ async function openStats() {
       Stats.mount(box, res, { path: [{ level: 'all' }, { level: 'store', v: sid, name: nick }], minDepth: 1 });
     }
     if (mine) {
-      const pc = mine.base ? Math.round((mine.done + mine.sold) / mine.base * 100) : 0;
+      const pc = Math.round(Stats.rate(mine) * 100);
       $('stSum').innerHTML = `<div><b>${mine.base.toLocaleString()}</b>기준재고${(mine.out || mine.in) ? `<br><span style="font-size:10px">원래 ${mine.base0}${mine.out ? ' −' + mine.out : ''}${mine.in ? ' +' + mine.in : ''}</span>` : ''}</div><div><b style="color:var(--ok)">${mine.done.toLocaleString()}</b>입력완료</div>` +
         `<div><b style="color:var(--sub)">${mine.sold.toLocaleString()}</b>개통완료</div><div><b style="color:var(--warn)">${mine.todo.toLocaleString()}</b>미완료 · ${pc}%</div>`;
     }
