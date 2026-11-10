@@ -226,13 +226,13 @@ let baseRows = null, curRows = null;   // 기준재고 / 현재재고 (조사현
 let picked = null;         // {code, name}
 
 function parseTable(text) { return Stock.parseCSV(String(text).replace(/^﻿/, '')); }
-// ---- 재고조사 ON/OFF (관리자 화면에서 설정, 공개 버킷 settings 파일) ----
+// 
 async function surveyOpen() {
   try {
     const t = parseTable(await AW.fileText(C.publicBucketId, C.settingsFileId));
     const m = new Map(t.map(r => [String(r[0]).trim(), String(r[1] ?? '').trim()]));
     return { open: m.get('survey') !== 'off', msg: m.get('message') || '' };
-  } catch (e) { return { open: true, msg: '' }; }      // 설정 파일이 없으면 열림
+  } catch (e) { return { open: true, msg: '' }; }      // 
 }
 async function checkOpen() {
   const st = await surveyOpen();
@@ -254,13 +254,13 @@ async function loadData() {
     stores = t.slice(1).map(r => ({ code: String(r[0] || '').trim(), name: String(r[1] || '').trim() })).filter(s => s.code || s.name);
     msgs.push(`판매점 ${stores.length.toLocaleString()}곳`);
   } catch (e) { msgs.push('판매점 목록 없음'); }
-  // 기준재고 + 현재재고 (현재재고는 판매/이관 비교용으로만 사용)
+  // 
   const [b, c] = await Promise.all([
     AW.fileText(C.publicBucketId, C.basePubFileId).then(t => Stock.toStockRows(parseTable(t))).catch(() => null),
     AW.fileText(C.publicBucketId, C.curPubFileId).then(t => Stock.toStockRows(parseTable(t))).catch(() => null)
   ]);
   baseRows = b; curRows = c;
-  // 모델명 찾기는 기준재고+현재재고 합쳐서 (입력·저장은 됨). 통계는 기준재고에 있는 단말만 집계
+  // 
   const union = [...new Map([...(b || []), ...(c || [])].map(r => [Stats.key(r.model, r.serial), r])).values()];
   stockIdx = union.length ? Stock.buildIndex(union) : null;
   msgs.push(b ? `기준재고 ${b.length.toLocaleString()}건` : '기준재고 없음');
@@ -313,7 +313,7 @@ function setChip(kind) {
 $('chipStore').onclick = () => setChip('store');
 $('chipStaff').onclick = () => setChip('staff');
 
-const STAFF_PW = '7777';   // 영업사원 공통 비밀번호
+const STAFF_PW = '7777';   // 
 function enter(p) {   // p = {kind:'store'|'staff', code, name}
   picked = p;
   $('btnStat').classList.toggle('hidden', p.kind !== 'staff');   // 조사현황은 영업사원만
