@@ -73,11 +73,31 @@
       return res.blob();
     },
     deleteFile: (bucket, id) => call('DELETE', `/storage/buckets/${bucket}/files/${id}`),
-    // 같은 ID 파일을 지우고 다시 올림 (덮어쓰기)
+    // 안전한 덮어쓰기: ① 기존 파일을 <id>_bak 으로 백업 → ② 기존 삭제 → ③ 새 파일 업로드
+    //   ③이 실패하면 백업본으로 원래 파일을 되살린 뒤 오류를 알림 (데이터가 비는 일이 없도록)
     replaceFile: async (bucket, id, blob, name) => {
-      try { await call('DELETE', `/storage/buckets/${bucket}/files/${id}`); } catch (e) { if (e.code !== 404) throw e; }
-      const fd = new FormData(); fd.append('fileId', id); fd.append('file', blob, name);
-      return call('POST', `/storage/buckets/${bucket}/files`, fd, { form: true });
+      const up = (fid, b, n) => { const fd = new FormData(); fd.append('fileId', fid); fd.append('file', b, n); return call('POST', `/storage/buckets/${bucket}/files`, fd, { form: true }); };
+      let old = null, oldName = name;
+      try {
+        const m = await call('GET', `/storage/buckets/${bucket}/files/${id}`); oldName = m.name || name;
+        old = await (await call('GET', `/storage/buckets/${bucket}/files/${id}/download`, null, { raw: true })).blob();
+      } catch (e) { if (e.code !== 404) throw e; }
+      if (old) {
+        try { await call('DELETE', `/storage/buckets/${bucket}/files/${id}_bak`); } catch (e) { if (e.code !== 404) throw e; }
+        await up(`${id}_bak`, old, oldName);
+        await call('DELETE', `/storage/buckets/${bucket}/files/${id}`);
+      }
+      try { return await up(id, blob, name); }
+      catch (e) {
+        if (old) { try { await up(id, old, oldName); e.message += ' (기존 파일은 그대로 복구했습니다)'; } catch (_) { e.message += ` (복구 실패 — 백업본 ${id}_bak 이 남아 있습니다)`; } }
+        throw e;
+      }
+    },
+    // 직전 버전(<id>_bak)으로 되돌리기: 현재본과 백업본을 맞바꿈
+    restoreFile: async (bucket, id) => {
+      const bm = await call('GET', `/storage/buckets/${bucket}/files/${id}_bak`);
+      const bak = await (await call('GET', `/storage/buckets/${bucket}/files/${id}_bak/download`, null, { raw: true })).blob();
+      return window.AW.replaceFile(bucket, id, bak, bm.name);
     },
     uploadFile: (bucket, id, blob, name) => {
       const fd = new FormData();
@@ -87,6 +107,7 @@
     },
 
     // DB
+    updateDoc: (db, col, id, data) => call('PATCH', `/databases/${db}/collections/${col}/documents/${id}`, { data }),
     deleteDoc: (db, col, id) => call('DELETE', `/databases/${db}/collections/${col}/documents/${id}`),
     createDoc: (db, col, data) =>
       call('POST', `/databases/${db}/collections/${col}/documents`, { documentId: 'unique()', data }),
