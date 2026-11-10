@@ -111,6 +111,21 @@
   .lost-form label{font-size:12px;color:var(--sub);display:grid;gap:4px}
   .lost-form input,.lost-form select{background:#0f1115;color:var(--txt);border:1px solid var(--line);border-radius:8px;padding:9px;font-size:14px;font-family:inherit;width:100%}
   .lost-hint{font-size:12px;color:var(--sub);margin-top:6px;min-height:16px}
+  .sv-bar{display:flex;gap:6px;align-items:center;margin:0 0 8px;flex-wrap:wrap}
+  .sv-bar input{flex:1;min-width:160px;background:#0f1115;color:var(--txt);border:1px solid var(--line);border-radius:8px;padding:9px;font-size:14px;font-family:inherit}
+  .sv-bar button{padding:9px 12px}
+  .seg{display:inline-flex;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+  .seg button{background:transparent;color:var(--sub);border-radius:0;padding:9px 14px}
+  .seg button.on{background:var(--acc);color:#fff}
+  tr.sus td{background:rgba(239,68,68,.08)}
+  .tag{display:inline-block;font-size:11px;font-weight:700;padding:1px 7px;border-radius:999px;margin-left:4px;vertical-align:1px}
+  .tag.r{background:rgba(239,68,68,.2);color:#f87171}.tag.g{background:rgba(34,197,94,.18);color:#4ade80}.tag.b{background:rgba(59,130,246,.2);color:#60a5fa}.tag.y{background:rgba(245,158,11,.2);color:#fbbf24}
+  td .lnk{white-space:nowrap;background:none;border:0;color:var(--acc);padding:0 4px;font-size:13px;cursor:pointer}
+  .onoff{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 8px;display:grid;gap:6px;text-align:center;font-size:12px;color:var(--sub);margin-bottom:6px}
+  .onoff button{padding:10px 4px;font-size:15px;font-weight:800;border-radius:999px}
+  .onoff button.on{background:var(--ok);color:#052e16}.onoff button.off{background:#4b5563;color:#e5e7eb}
+  .onoff small{font-size:10.5px;line-height:1.4}
+  a.rb{color:var(--sub);font-size:12px;margin-left:8px;cursor:pointer;text-decoration:underline}
   td .x{background:none;border:0;color:var(--bad);font-size:18px;padding:0 4px;cursor:pointer}
   @media (max-width:640px){.lost-form{grid-template-columns:1fr 1fr}}
 </style>
@@ -128,7 +143,7 @@
 
   <div id="adminBody" class="hidden">
    <div class="layout">
-    <div class="side"><button id="tabStats" class="on">통계</button><button id="tabLookup">조회</button><button id="tabManage">관리</button></div>
+    <div class="side"><div class="onoff" id="onoffBox"><span>재고조사</span><button id="btnOnOff" disabled>확인 중</button><small id="onoffAt"></small></div><button id="tabStats" class="on">통계</button><button id="tabLookup">조회</button><button id="tabManage">관리</button></div>
     <div class="body">
 
     <!-- ===== 통계 ===== -->
@@ -178,9 +193,14 @@
           <button class="grn" id="btnDlAll">전체 다운로드</button>
         </span></h2>
       <div class="stats" id="svStats"></div>
+      <div class="sv-bar">
+        <span class="seg" id="svSeg"><button data-v="item" class="on">건별</button><button data-v="doc">전송별</button></span>
+        <input id="svQ" placeholder="입력자·모델·일련번호 검색 (2자 이상, Enter)" autocomplete="off">
+        <button class="sec" id="btnSvQ">검색</button><button class="sec hidden" id="btnSvQx">해제</button>
+      </div>
       <div class="scroll"><table>
-        <thead><tr><th style="width:44px">No</th><th>판매점명</th><th>모델명</th><th>일련번호</th></tr></thead>
-        <tbody id="svBody"><tr><td colspan="4" style="color:var(--sub)">불러오는 중...</td></tr></tbody>
+        <thead id="svHead"></thead>
+        <tbody id="svBody"><tr><td colspan="6" style="color:var(--sub)">불러오는 중...</td></tr></tbody>
       </table></div>
       <div class="msg" id="svMsg"></div>
     </div>
@@ -241,8 +261,9 @@
 
     <!-- 분실 목록 -->
     <div class="card">
-      <h2><span>분실 목록 <small id="lostInfo"></small></span>
+      <h2><span>분실 목록 <small id="lostInfo"></small><a class="rb" data-rb="lost">직전 저장본으로 되돌리기</a></span>
         <span class="btnrow"><label class="filebtn" style="background:#374151;color:#fff;border-radius:10px;padding:11px 14px;font-size:14px;font-weight:600;cursor:pointer">엑셀로 추가<input type="file" id="fileLost" accept=".csv,.xlsx,.xls" hidden></label></span></h2>
+      <div class="msg" id="lostAlert" style="margin:0 0 10px"></div>
       <div class="lost-form">
         <label>모델명<input id="lsModel" list="lsModels" placeholder="SM-S942N256" autocomplete="off"></label>
         <label>일련번호<input id="lsSerial" placeholder="일련번호" autocomplete="off"></label>
@@ -251,10 +272,10 @@
         <button id="btnLostAdd">추가</button>
       </div>
       <datalist id="lsModels"></datalist>
-      <div class="lost-hint" id="lostHint">일련번호 입력 후 Enter 또는 [추가] · 엑셀은 모델명, 일련번호, 기존분실건, 비고 컬럼</div>
+            <div class="lost-hint" id="lostHint">일련번호 입력 후 Enter 또는 [추가] · 엑셀은 모델명, 일련번호, 기존분실건, 비고 컬럼</div>
       <div class="scroll" style="margin-top:8px"><table>
-        <thead><tr><th style="width:40px">No</th><th>모델명</th><th>일련번호</th><th>기존분실</th><th>비고</th><th>기준재고</th><th style="width:30px"></th></tr></thead>
-        <tbody id="lostBody"><tr><td colspan="7" style="color:var(--sub)">불러오는 중...</td></tr></tbody>
+        <thead><tr><th style="width:40px">No</th><th>모델명</th><th>일련번호</th><th>기존분실</th><th>비고</th><th>기준재고 위치</th><th>현재 상태</th><th style="width:84px"></th></tr></thead>
+        <tbody id="lostBody"><tr><td colspan="8" style="color:var(--sub)">불러오는 중...</td></tr></tbody>
       </table></div>
       <div class="msg" id="lostMsg"></div>
     </div>
@@ -265,10 +286,10 @@
   </div>
 </main>
 
-<script src="config.js?v=20261110d"></script>
-<script src="appwrite.js?v=20261110d"></script>
-<script src="stock.js?v=20261110d"></script>
-<script src="stats.js?v=20261110d"></script>
+<script src="config.js?v=20261110e"></script>
+<script src="appwrite.js?v=20261110e"></script>
+<script src="stock.js?v=20261110e"></script>
+<script src="stats.js?v=20261110e"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script>
 const $ = id => document.getElementById(id);
@@ -330,7 +351,7 @@ async function refreshAll() {
     loadCur().catch(e => errs.push('현재재고: ' + e.message)),
     loadDocs().catch(e => errs.push('입력내역: ' + e.message)),
     loadLost().catch(e => errs.push('분실목록: ' + e.message)),
-    showFileInfo(), showStoresInfo()
+    showFileInfo(), showStoresInfo(), loadOnOff()
   ]);
   renderSurveys(); renderStats(); renderLost();
   if (errs.length) $('stInfo').innerHTML += `<br><span class="bad">${esc(errs.join(' / '))}</span>`;
@@ -342,6 +363,7 @@ async function showFileInfo() {
     try {
       const m = await AW.fileMeta(bucket, id);
       $(el).innerHTML = `등록됨 · ${fmt(m.$updatedAt)}`; $(el).dataset.at = m.$updatedAt;
+      AW.fileMeta(bucket, id + '_bak').then(bm => { $(el).insertAdjacentHTML('beforeend', `<a class="rb" data-rb="${id === C.baseFileId ? 'base' : 'cur'}" title="직전 업로드: ${esc(fmt(bm.$createdAt))}">직전 버전으로 되돌리기</a>`); bindRb(); }).catch(() => {});
     } catch (e) { $(el).innerHTML = e.code === 404 ? `<span class="warn">등록된 ${label} 없음</span>` : `<span class="bad">오류: ${esc(e.message)}</span>`; }
   }
 }
@@ -453,12 +475,73 @@ function renderSurveys() {
   const stores = new Set(entries.map(e => e.store));
   $('svInfo').textContent = `${svDocs.length}회 전송`;
   $('svStats').innerHTML = `<div><b>${entries.length.toLocaleString()}</b>입력 단말</div><div><b>${stores.size}</b>입력자</div><div><b class="${entries.some(e => !e.matched) ? 'warn' : ''}">${entries.filter(e => !e.matched).length}</b>재고 미등록</div><div><b>${dupCnt}</b>중복 입력 (이전 입력 제외됨)</div>`;
-  const MAX = 500;
-  $('svBody').innerHTML = entries.length
-    ? entries.slice(0, MAX).map((e, i) => `<tr><td class="n">${i + 1}</td><td>${esc(e.store)}</td><td${e.matched ? '' : ' class="warn"'}>${esc(modelLabel(e))}</td><td class="mono">${esc(e.serial)}</td></tr>`).join('')
-      + (entries.length > MAX ? `<tr><td colspan="4" style="color:var(--sub)">… 최근 ${MAX}건만 표시 (전체는 [입력건 다운로드])</td></tr>` : '')
-    : '<tr><td colspan="4" style="color:var(--sub)">입력된 내역이 없습니다</td></tr>';
+  drawSurveys(idx);
 }
+// ---- 입력완료 내역: 건별 / 전송별 보기 + 삭제 ----
+let svView = 'item', svQ = '', svDocF = null, svIdx = null;
+const SUS_MIN = 5;    // 의심 전송: 재고에 없는 단말이 5건 이상이면서 절반 이상
+function docInfo(d) {
+  let its = []; try { its = JSON.parse(d.items || '[]'); } catch (e) {}
+  const un = svIdx ? its.filter(x => !svIdx.find([x.r || x.s, x.s]).rows.length).length : its.filter(x => !x.k).length;
+  return { its, un, sus: un >= SUS_MIN && un / Math.max(its.length, 1) >= 0.5, who: d.pcode === '영업사원' ? `${d.store} (영업사원)` : `${d.store} · ${d.pcode}` };
+}
+function drawSurveys(idx) {
+  if (idx !== undefined) svIdx = idx;
+  $('svSeg').querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.v === svView));
+  $('btnSvQx').classList.toggle('hidden', !svQ && !svDocF);
+  const q = Stock.norm(svQ), hitQ = (...v) => !q || v.some(x => Stock.norm(x).includes(q));
+  const MAX = 500, empty = (n, t) => `<tr><td colspan="${n}" style="color:var(--sub)">${t}</td></tr>`;
+  if (svView === 'item') {
+    $('svHead').innerHTML = '<tr><th style="width:44px">No</th><th>입력자</th><th>모델명</th><th>일련번호</th><th>입력시각</th><th style="width:30px"></th></tr>';
+    const rows = entries.filter(e => (!svDocF || e.docId === svDocF) && hitQ(e.store, e.model, e.serial));
+    $('svBody').innerHTML = rows.length
+      ? rows.slice(0, MAX).map((e, i) => `<tr><td class="n">${i + 1}</td><td>${esc(e.store)}</td><td${e.matched ? '' : ' class="warn"'}>${esc(modelLabel(e))}</td><td class="mono">${esc(e.serial)}</td><td style="font-size:12px;color:var(--sub)">${esc(fmt(e.at))}</td><td><button class="x" data-s="${esc(e.serial)}" title="이 단말 입력 삭제">×</button></td></tr>`).join('')
+        + (rows.length > MAX ? empty(6, `… ${MAX}건까지만 표시 (검색으로 좁히거나 [입력건 다운로드])`) : '')
+      : empty(6, svQ || svDocF ? '조건에 맞는 입력이 없습니다' : '입력된 내역이 없습니다');
+    $('svBody').querySelectorAll('.x').forEach(b => b.onclick = () => delSerial(b.dataset.s));
+  } else {
+    $('svHead').innerHTML = '<tr><th style="width:44px">No</th><th>입력시각</th><th>입력자</th><th class="n">건수</th><th class="n">재고 미등록</th><th style="width:96px"></th></tr>';
+    const docs = svDocs.map(d => ({ d, ...docInfo(d) })).filter(x => hitQ(x.who, ...x.its.map(i => i.s), ...x.its.map(i => i.m || '')));
+    const nSus = docs.filter(x => x.sus).length;
+    $('svBody').innerHTML = (nSus ? `<tr><td colspan="6" class="bad" style="font-size:13px">의심 전송 ${nSus}건 — 재고에 없는 단말이 많이 들어온 전송입니다. 내용을 확인하고 잘못된 전송이면 삭제하세요.</td></tr>` : '') + (docs.length
+      ? docs.slice(0, MAX).map((x, i) => `<tr class="${x.sus ? 'sus' : ''}"><td class="n">${i + 1}</td><td style="font-size:12px">${esc(fmt(x.d.$createdAt))}</td><td>${esc(x.who)}${x.sus ? '<span class="tag r">의심</span>' : ''}</td><td class="n">${fmtN(x.its.length)}</td><td class="n${x.un ? ' warn' : ''}">${fmtN(x.un)}</td>
+          <td><button class="lnk" data-v="${x.d.$id}">보기</button><button class="x" data-d="${x.d.$id}" title="이 전송 전체 삭제">×</button></td></tr>`).join('')
+      : empty(6, svQ ? '조건에 맞는 전송이 없습니다' : '전송 내역이 없습니다'));
+    $('svBody').querySelectorAll('.lnk').forEach(b => b.onclick = () => { svDocF = b.dataset.v; svView = 'item'; drawSurveys(); });
+    $('svBody').querySelectorAll('.x').forEach(b => b.onclick = () => delDoc(b.dataset.d));
+  }
+}
+$('svSeg').querySelectorAll('button').forEach(b => b.onclick = () => { svView = b.dataset.v; if (svView === 'doc') svDocF = null; drawSurveys(); });
+const svSearch = () => { const v = $('svQ').value.trim(); if (v && v.length < 2) return alert('검색어는 2자 이상 입력하세요'); svQ = v; drawSurveys(); };
+$('btnSvQ').onclick = svSearch;
+$('svQ').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); svSearch(); } });
+$('btnSvQx').onclick = () => { svQ = ''; svDocF = null; $('svQ').value = ''; drawSurveys(); };
+// 건별 삭제: 그 일련번호를 모든 전송에서 지움 (전송이 비면 전송 자체 삭제)
+async function delSerial(serial) {
+  const k = Stock.norm(serial);
+  const hit = svDocs.map(d => ({ d, ...docInfo(d) })).filter(x => x.its.some(i => Stock.norm(i.s) === k));
+  if (!hit.length) return;
+  if (!confirm(`${serial} 입력을 삭제할까요?` + (hit.length > 1 ? `\n(같은 일련번호가 ${hit.length}번 전송돼 있어 모두 지웁니다)` : '') + '\n삭제하면 미완료로 돌아갑니다.')) return;
+  $('svMsg').textContent = '삭제 중...';
+  try {
+    for (const x of hit) {
+      const rest = x.its.filter(i => Stock.norm(i.s) !== k);
+      if (rest.length) await AW.updateDoc(C.databaseId, C.surveyCollectionId, x.d.$id, { items: JSON.stringify(rest), count: rest.length });
+      else await AW.deleteDoc(C.databaseId, C.surveyCollectionId, x.d.$id);
+    }
+    $('svMsg').innerHTML = `<span class="ok">${esc(serial)} 삭제했습니다</span>`;
+  } catch (e) { $('svMsg').innerHTML = `<span class="bad">삭제 실패: ${esc(e.message)}${e.code === 401 ? ' (surveys 컬렉션 Update·Delete 권한 확인)' : ''}</span>`; }
+  await reloadSurveys();
+}
+async function delDoc(id) {
+  const d = svDocs.find(x => x.$id === id); if (!d) return; const x = docInfo(d);
+  if (!confirm(`${fmt(d.$createdAt)} ${x.who} 전송 ${x.its.length}건을 모두 삭제할까요?\n삭제하면 미완료로 돌아갑니다.`)) return;
+  $('svMsg').textContent = '삭제 중...';
+  try { await AW.deleteDoc(C.databaseId, C.surveyCollectionId, id); $('svMsg').innerHTML = `<span class="ok">전송 ${x.its.length}건 삭제했습니다</span>`; if (svDocF === id) svDocF = null; }
+  catch (e) { $('svMsg').innerHTML = `<span class="bad">삭제 실패: ${esc(e.message)}</span>`; }
+  await reloadSurveys();
+}
+async function reloadSurveys() { await loadDocs(); renderSurveys(); renderStats(); renderLost(); }
 $('btnSvReload').onclick = refreshAll;
 const modelLabel = e => e.matched ? e.model : (e.gone && e.model ? `${e.model} (재고리스트에 없음)` : '재고 미등록');
 
@@ -575,12 +658,15 @@ function lostReportRows() {
   const order = new Map(); Stats.REGION_DEF.forEach(([, ms], ri) => ms.forEach((m, mi) => order.set(m, ri * 100 + mi)));
   const rows = lostList.map(l => {
     const it = itemMap.get(Stats.key(l.model, l.serial)), o = it ? it.owner : null;
-    const auto = !it ? '기준재고 없음' : it.status === 'done' ? '조사완료됨' : it.status === 'sold' ? '현재재고 없음(개통)' : '';
+    // 분실 등록 후 조사 입력되면 '발견', 현재재고에서 빠졌으면 '개통확인' → 목록에는 남기되 합계에서는 제외
+    const kind = it && it.status === 'done' ? '발견' : it && it.status === 'sold' ? '개통확인' : l.prev === 'Y' ? '기존 분실건' : '추가 확인건';
+    const auto = !it ? '기준재고 없음' : it.status === 'done' ? `${it.sv.store} 입력` : it.status === 'sold' ? '현재재고 없음' : '';
     return { region: o ? Stats.regionOf(o.group) : '', group: o ? o.group : '', nick: o ? o.nick : '', model: it ? it.b.model : l.model,
-             serial: it ? it.b.serial : l.serial, price: it ? (it.b.price || 0) : 0, kind: l.prev === 'Y' ? '기존 분실건' : '추가 확인건',
+             serial: it ? it.b.serial : l.serial, price: it ? (it.b.price || 0) : 0, kind, active: kind === '추가 확인건' || kind === '기존 분실건',
              memo: [l.memo, auto].filter(Boolean).join(' / ') };
   });
-  rows.sort((x, y) => (x.kind === '추가 확인건' ? 0 : 1) - (y.kind === '추가 확인건' ? 0 : 1) || (Stats.REGIONS.indexOf(x.region) + 1 || 99) - (Stats.REGIONS.indexOf(y.region) + 1 || 99) || (order.get(x.group) ?? 9999) - (order.get(y.group) ?? 9999)
+  const KO = { '추가 확인건': 0, '기존 분실건': 1, '발견': 2, '개통확인': 3 };
+  rows.sort((x, y) => KO[x.kind] - KO[y.kind] || (Stats.REGIONS.indexOf(x.region) + 1 || 99) - (Stats.REGIONS.indexOf(y.region) + 1 || 99) || (order.get(x.group) ?? 9999) - (order.get(y.group) ?? 9999)
     || String(x.nick).localeCompare(y.nick) || String(x.model).localeCompare(y.model));
   return rows;
 }
@@ -619,11 +705,11 @@ function renderReport() {
         return `<tr class="${sep ? 'sep' : ''}">${regCell(g[0], 12)}<td class="nw" style="font-size:${g[1].length > 6 ? 10 : 12}px">${esc(g[1])}</td>${cells(g.slice(2), false, true)}</tr>`; }).join('')}
       </tbody></table>${SIGN_HTML}`;
   // 2페이지~: 분실리스트 (길면 여러 장, 제목열은 매 장 반복, 결재란은 마지막 장에만)
-  const L = D.lost, sumPrice = L.reduce((t, x) => t + x.price, 0);
+  const L = D.lost, LA = L.filter(x => x.active), sumPrice = LA.reduce((t, x) => t + x.price, 0), nOff = L.length - LA.length;
   const colg = '<colgroup><col style="width:5%"><col style="width:8%"><col style="width:8%"><col style="width:22%"><col style="width:13%"><col style="width:11%"><col style="width:10.5%"><col style="width:10%"><col></colgroup>';
   const thead = '<thead><tr><th>순번</th><th>그룹</th><th>담당</th><th>POS닉네임</th><th>모델명</th><th>일련번호</th><th>출고가</th><th>구분</th><th>비고</th></tr></thead>';
-  const trow = (x, i) => `<tr><td>${i + 1}</td>${regCell(x.region, 12)}<td class="nw">${esc(x.group)}</td><td class="l" style="font-size:11px" title="${esc(x.nick)}">${esc(x.nick)}</td><td class="nw" style="font-size:11.5px">${esc(x.model)}</td><td>${esc(showSerialRp(x))}</td><td class="n">${fmtN(x.price)}</td><td class="nw${x.kind === '추가 확인건' ? ' red' : ''}">${x.kind}</td><td class="l" style="font-size:11px" title="${esc(x.memo)}">${esc(x.memo)}</td></tr>`;
-  const totRow = `<tr class="tot"><td colspan="6">합계 ${fmtN(L.length)}건 (추가 확인 ${fmtN(L.filter(x => x.kind === '추가 확인건').length)} · 기존 분실 ${fmtN(L.filter(x => x.kind === '기존 분실건').length)})</td><td class="n">${fmtN(sumPrice)}</td><td colspan="2"></td></tr>`;
+  const trow = (x, i) => `<tr${x.active ? '' : ' style="color:#888"'}><td>${i + 1}</td>${regCell(x.region, 12)}<td class="nw">${esc(x.group)}</td><td class="l" style="font-size:11px" title="${esc(x.nick)}">${esc(x.nick)}</td><td class="nw" style="font-size:11.5px">${esc(x.model)}</td><td>${esc(showSerialRp(x))}</td><td class="n">${fmtN(x.price)}</td><td class="nw${x.kind === '추가 확인건' ? ' red' : ''}"${x.active ? '' : ' style="color:#0a7a3a;font-weight:700"'}>${x.kind}</td><td class="l" style="font-size:11px" title="${esc(x.memo)}">${esc(x.memo)}</td></tr>`;
+  const totRow = `<tr class="tot"><td colspan="6">합계 ${fmtN(LA.length)}건 (추가 확인 ${fmtN(L.filter(x => x.kind === '추가 확인건').length)} · 기존 분실 ${fmtN(L.filter(x => x.kind === '기존 분실건').length)})${nOff ? ` · 발견·개통확인 ${fmtN(nOff)}건 제외` : ''}</td><td class="n">${fmtN(sumPrice)}</td><td colspan="2"></td></tr>`;
   const chunks = lostPages(L.length);
   const NP = chunks.length;
   $('reportLost').innerHTML = chunks.map(([from, to], pi) => {
@@ -745,11 +831,14 @@ $('btnRpXlsx').onclick = async () => {
       D.lost.forEach((x, i) => {
         put(r, 1, i + 1); put(r, 2, x.region, { shrink: true, font: { size: x.region.length >= 4 ? 9 : 10 } }); put(r, 3, x.group, { shrink: true });
         put(r, 4, x.nick, { h: 'left', shrink: true, font: { size: 9 } }); put(r, 5, x.model, { shrink: true }); put(r, 6, showSerialRp(x));
-        put(r, 7, x.price, { h: 'right', fmt: '#,##0' }); put(r, 8, x.kind, x.kind === '추가 확인건' ? { font: RED } : {}); put(r, 9, x.memo, { h: 'left', font: { size: 9 } }); r++;
+        put(r, 7, x.price, { h: 'right', fmt: '#,##0' }); put(r, 8, x.kind, x.kind === '추가 확인건' ? { font: RED } : x.active ? {} : { font: { color: { argb: 'FF0A7A3A' }, bold: true } }); put(r, 9, x.memo, { h: 'left', font: { size: 9 } });
+        if (!x.active) for (const c of [1, 2, 3, 4, 5, 6, 7, 9]) ws.getCell(r, c).font = { ...ws.getCell(r, c).font, color: { argb: 'FF888888' } };
+        r++;
       });
       const yl = { fill: 'FFFFF2CC', font: { bold: true } };
-      ws.mergeCells(r, 1, r, 6); put(r, 1, `합계 ${D.lost.length}건 (추가 확인 ${D.lost.filter(x => x.kind === '추가 확인건').length} · 기존 분실 ${D.lost.filter(x => x.kind === '기존 분실건').length})`, yl);
-      put(r, 7, D.lost.reduce((t, x) => t + x.price, 0), { ...yl, h: 'right', fmt: '#,##0' }); ws.mergeCells(r, 8, r, 9); put(r, 8, '', yl);
+      const LA = D.lost.filter(x => x.active), nOff = D.lost.length - LA.length;
+      ws.mergeCells(r, 1, r, 6); put(r, 1, `합계 ${LA.length}건 (추가 확인 ${D.lost.filter(x => x.kind === '추가 확인건').length} · 기존 분실 ${D.lost.filter(x => x.kind === '기존 분실건').length})${nOff ? ` · 발견·개통확인 ${nOff}건 제외` : ''}`, yl);
+      put(r, 7, LA.reduce((t, x) => t + x.price, 0), { ...yl, h: 'right', fmt: '#,##0' }); ws.mergeCells(r, 8, r, 9); put(r, 8, '', yl);
       outline(s, r); sign(r + 2);
     }
     saveBlob(new Blob([await wb.xlsx.writeBuffer()], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), rpName('xlsx'));
@@ -775,23 +864,44 @@ async function saveLost() {
   await AW.replaceFile(C.bucketId, C.lostFileId, new Blob([csv], { type: 'text/csv' }), 'lost.csv');
 }
 const baseByKey = () => new Map((baseRows || []).map(r => [Stats.key(r.model, r.serial), r]));
+// 분실 등록건의 현재 상태: 발견(조사 입력됨) / 개통확인(현재재고에 없음) / 분실(미발견) / 기준재고 없음
+function lostState(l) {
+  const it = statRes ? statRes.items.find(x => Stats.key(x.b.model, x.b.serial) === Stats.key(l.model, l.serial)) : null;
+  if (!it) return { k: 'none', it };
+  return { k: it.status === 'done' ? 'found' : it.status === 'sold' ? 'sold' : 'lost', it };
+}
 function renderLost() {
   const bm = baseByKey();
   $('lsModels').innerHTML = [...new Set((baseRows || []).map(r => r.model))].sort().map(m => `<option value="${esc(m)}">`).join('');
-  $('lostInfo').textContent = `${lostList.length}건 (기존 ${lostList.filter(l => l.prev === 'Y').length} · 추가 ${lostList.filter(l => l.prev !== 'Y').length})`;
-  $('lostBody').innerHTML = lostList.length ? lostList.map((l, i) => { const b = bm.get(Stats.key(l.model, l.serial));
-    return `<tr><td class="n">${i + 1}</td><td>${esc(l.model)}</td><td class="mono">${esc(l.serial)}</td><td>${l.prev === 'Y' ? '<b>Y</b>' : 'N'}</td><td>${esc(l.memo)}</td>
-      <td>${b ? `<span class="ok">${esc(b.group)} · ${esc(b.nick)}</span>` : '<span class="warn">기준재고에 없음</span>'}</td><td><button class="x" data-i="${i}" title="삭제">×</button></td></tr>`; }).join('')
-    : '<tr><td colspan="7" style="color:var(--sub)">등록된 분실 건이 없습니다</td></tr>';
-  $('lostBody').querySelectorAll('.x').forEach(b => b.onclick = async () => {
-    const l = lostList[+b.dataset.i]; if (!confirm(`${l.model} ${l.serial} 을(를) 분실 목록에서 삭제할까요?`)) return;
-    lostList.splice(+b.dataset.i, 1); await persistLost('삭제했습니다');
+  const rows = lostList.map((l, i) => ({ l, i, st: lostState(l) }));
+  const ord = { found: 0, sold: 1, lost: 2, none: 3 };
+  rows.sort((x, y) => ord[x.st.k] - ord[y.st.k] || x.i - y.i);    // 발견·개통된 건을 위로
+  const nF = rows.filter(r => r.st.k === 'found').length, nS = rows.filter(r => r.st.k === 'sold').length;
+  $('lostInfo').textContent = `${lostList.length}건 (추가 ${lostList.filter(l => l.prev !== 'Y').length} · 기존 ${lostList.filter(l => l.prev === 'Y').length})`;
+  $('lostAlert').innerHTML = (nF || nS) ? `<span class="ok" style="font-weight:700">분실 등록 중 ${nF ? `발견(조사 입력) ${nF}건` : ''}${nF && nS ? ' · ' : ''}${nS ? `개통확인 ${nS}건` : ''}</span> — 확인 후 [분실 해제]를 누르세요. 해제 전까지는 보고서 2페이지에 '발견/개통확인'으로 표시되고 합계에서는 빠집니다.` : '';
+  $('lostBody').innerHTML = rows.length ? rows.map(({ l, i, st }, n) => { const b = bm.get(Stats.key(l.model, l.serial));
+    const sv = st.it && st.it.sv;
+    const state = st.k === 'found' ? `<span class="tag g">발견</span> <span style="font-size:12px">${esc(sv.store)} · ${esc(fmt(sv.at))}</span>`
+      : st.k === 'sold' ? '<span class="tag b">개통확인</span> <span style="font-size:12px;color:var(--sub)">현재재고에 없음</span>'
+      : st.k === 'lost' ? '<span class="tag r">분실</span>' : '<span style="color:var(--sub);font-size:12px">-</span>';
+    return `<tr${st.k === 'found' || st.k === 'sold' ? ' style="background:rgba(34,197,94,.07)"' : ''}><td class="n">${n + 1}</td><td>${esc(l.model)}</td><td class="mono">${esc(l.serial)}</td><td>${l.prev === 'Y' ? '<b>Y</b>' : 'N'}</td><td>${esc(l.memo)}</td>
+      <td>${b ? `<span>${esc(b.group)} · ${esc(b.nick)}</span>` : '<span class="warn">기준재고에 없음</span>'}</td><td>${state}</td>
+      <td>${st.k === 'found' || st.k === 'sold' ? `<button class="lnk" data-i="${i}">분실 해제</button>` : `<button class="x" data-i="${i}" title="삭제">×</button>`}</td></tr>`; }).join('')
+    : '<tr><td colspan="8" style="color:var(--sub)">등록된 분실 건이 없습니다</td></tr>';
+  $('lostBody').querySelectorAll('button[data-i]').forEach(btn => btn.onclick = async () => {
+    const l = lostList[+btn.dataset.i], rel = btn.classList.contains('lnk');
+    if (!confirm(rel ? `${l.model} ${l.serial} 을(를) 분실 목록에서 해제할까요? (발견·개통 확인됨)` : `${l.model} ${l.serial} 을(를) 분실 목록에서 삭제할까요?`)) return;
+    const k = Stats.key(l.model, l.serial);
+    await persistLost(rel ? '분실 해제했습니다' : '삭제했습니다', () => { lostList = lostList.filter(x => Stats.key(x.model, x.serial) !== k); });
   });
 }
-async function persistLost(okMsg) {
-  try { await saveLost(); $('lostMsg').innerHTML = `<span class="ok">${esc(okMsg)}</span>`; }
-  catch (e) { $('lostMsg').innerHTML = `<span class="bad">저장 실패: ${esc(e.message)}</span>`; }
-  renderLost(); renderStats();
+async function persistLost(okMsg, op) {
+  try {
+    try { await loadLost(); } catch (e) {}       // 다른 관리자가 그사이 고친 내용을 먼저 받아온 뒤 반영 (덮어쓰기 방지)
+    op && op();
+    await saveLost(); $('lostMsg').innerHTML = `<span class="ok">${esc(okMsg)}</span>`;
+  } catch (e) { $('lostMsg').innerHTML = `<span class="bad">저장 실패: ${esc(e.message)}</span>`; try { await loadLost(); } catch (_) {} }
+  renderStats(); renderLost();
 }
 function upsertLost(item) {
   const k = Stats.key(item.model, item.serial), i = lostList.findIndex(l => Stats.key(l.model, l.serial) === k);
@@ -808,9 +918,10 @@ function lostHint() {
 $('btnLostAdd').onclick = async () => {
   const model = $('lsModel').value.trim(), serial = Stock.norm($('lsSerial').value);
   if (!model || serial.length < 2) return alert('모델명과 일련번호를 입력하세요');
-  const upd = upsertLost({ model, serial, prev: $('lsPrev').value, memo: $('lsMemo').value.trim() });
+  const item = { model, serial, prev: $('lsPrev').value, memo: $('lsMemo').value.trim() };
+  const existed = lostList.some(l => Stats.key(l.model, l.serial) === Stats.key(model, serial));
   $('lsSerial').value = ''; $('lsMemo').value = ''; $('lsSerial').focus(); lostHint();
-  await persistLost(upd ? `${model} ${serial} 수정했습니다` : `${model} ${serial} 추가했습니다`);
+  await persistLost(existed ? `${model} ${serial} 수정했습니다` : `${model} ${serial} 추가했습니다`, () => upsertLost(item));
 };
 ['lsSerial', 'lsMemo'].forEach(id => $(id).addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); $('btnLostAdd').click(); } }));
 $('fileLost').onchange = async e => {
@@ -821,15 +932,50 @@ $('fileLost').onchange = async e => {
     if (hi < 0) throw new Error('헤더에 "모델명", "일련번호" 컬럼이 필요합니다');
     const h = t[hi].map(v => String(v).replace(/\s/g, ''));
     const iM = h.findIndex(v => /모델/.test(v)), iS = h.findIndex(v => /일련/.test(v)), iP = h.findIndex(v => /기존|분실/.test(v)), iR = h.findIndex(v => /비고|메모/.test(v));
-    let add = 0, upd = 0;
+    const items = [];
     for (const r of t.slice(hi + 1)) {
       const model = String(r[iM] ?? '').trim(), serial = Stock.norm(r[iS]);
       if (!model || !serial) continue;
       const prev = iP >= 0 && /^(Y|예|O|기존)/i.test(String(r[iP] ?? '').trim()) ? 'Y' : 'N';
-      upsertLost({ model, serial, prev, memo: iR >= 0 ? String(r[iR] ?? '').trim() : '' }) ? upd++ : add++;
+      items.push({ model, serial, prev, memo: iR >= 0 ? String(r[iR] ?? '').trim() : '' });
     }
-    await persistLost(`엑셀 반영: 추가 ${add}건 · 수정 ${upd}건`);
+    let add = 0, upd = 0;
+    await persistLost('', () => { for (const it of items) upsertLost(it) ? upd++ : add++; });
+    if (!$('lostMsg').querySelector('.bad')) $('lostMsg').innerHTML = `<span class="ok">엑셀 반영: 추가 ${add}건 · 수정 ${upd}건</span>`;
   } catch (err) { $('lostMsg').innerHTML = `<span class="bad">파일 오류: ${esc(err.message)}</span>`; }
+};
+
+// ================= 직전 버전으로 되돌리기 (덮어쓰기 전에 자동 백업된 <id>_bak) =================
+const RB = { base: ['기준재고', [[C.bucketId, C.baseFileId], [C.publicBucketId, C.basePubFileId]]],
+             cur: ['현재재고', [[C.publicBucketId, C.curPubFileId]]], lost: ['분실 목록', [[C.bucketId, C.lostFileId]]] };
+function bindRb() { document.querySelectorAll('a.rb').forEach(a => a.onclick = async () => {
+  const [label, files] = RB[a.dataset.rb];
+  if (!confirm(`${label}를 직전 버전으로 되돌릴까요?\n(지금 버전은 다시 백업되므로 한 번 더 누르면 원래대로 돌아옵니다)`)) return;
+  try { for (const [b, id] of files) await AW.restoreFile(b, id); alert(`${label}를 직전 버전으로 되돌렸습니다`); }
+  catch (e) { alert(e.code === 404 ? `${label}의 백업본이 없습니다 (이번 버전부터 덮어쓸 때 자동으로 만들어집니다)` : `되돌리기 실패: ${e.message}`); }
+  refreshAll();
+}); }
+bindRb();
+
+// ================= 재고조사 ON/OFF (조사 화면 접속 허용 여부) =================
+let surveyOn = true;
+async function loadOnOff() {
+  try {
+    const t = Stock.parseCSV((await AW.fileText(C.publicBucketId, C.settingsFileId)).replace(/^\uFEFF/, ''));
+    const m = new Map(t.map(r => [String(r[0]).trim(), String(r[1] ?? '').trim()]));
+    surveyOn = m.get('survey') !== 'off'; $('onoffAt').textContent = m.get('updated') ? `${m.get('updated')}` : '';
+  } catch (e) { surveyOn = true; $('onoffAt').textContent = e.code === 404 ? '설정 전 (기본 ON)' : '확인 실패'; }
+  const b = $('btnOnOff'); b.disabled = false; b.textContent = surveyOn ? 'ON' : 'OFF'; b.className = surveyOn ? 'on' : 'off';
+  b.title = surveyOn ? '지금 조사 화면에 접속할 수 있습니다. 누르면 OFF' : '지금 조사 화면이 막혀 있습니다. 누르면 ON';
+}
+$('btnOnOff').onclick = async () => {
+  const next = !surveyOn;
+  if (!confirm(next ? '재고조사를 시작(ON)할까요?\n조사 화면에 접속할 수 있게 됩니다.' : '재고조사를 종료(OFF)할까요?\n조사 화면이 열리지 않고, 이미 열려 있는 화면에서도 전송이 막힙니다.')) return;
+  $('btnOnOff').disabled = true;
+  const d = new Date(), stamp = `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')} ${next ? 'ON' : 'OFF'}`;
+  try { await AW.replaceFile(C.publicBucketId, C.settingsFileId, new Blob([`\uFEFFkey,value\nsurvey,${next ? 'on' : 'off'}\nupdated,${stamp}\n`], { type: 'text/csv' }), 'settings.csv'); }
+  catch (e) { alert('변경 실패: ' + e.message); }
+  loadOnOff();
 };
 
 // ================= 탭 (우측 세로 메뉴) =================
