@@ -140,8 +140,8 @@
   const n = v => (v || 0).toLocaleString();
   // 삼성은 라벨처럼 7자리로 표시 (엑셀에서 빠진 앞자리 0 복원)
   const showSerial = r => /^SM-/i.test(r.model) && /^\d{1,6}$/.test(r.serial) ? r.serial.padStart(7, '0') : r.serial;
-  // 진행율 = 조사완료합계(입력완료+개통완료) ÷ (조정재고 − 분실)  → 분실은 확인된 건이라 분모에서 빼서 최대 100%
-  const rate = a => { const d = (a.base || 0) - (a.lost || 0); return d > 0 ? (a.done + a.sold) / d : (a.base ? 1 : 0); };
+  // 진행율 = (조사완료합계 + 분실) ÷ 조정재고   (조사완료합계 = 입력완료 + 개통완료, 분실도 확인된 건으로 봄)
+  const rate = a => a.base ? (a.done + a.sold + (a.lost || 0)) / a.base : 0;
   const pct = a => Math.round(rate(a) * 100);
 
   // path: [{level:'all'}, {level:'region', v}, {level:'group', v}, {level:'store', v, name}]
@@ -192,7 +192,7 @@
         ${keys.map(k => row(k, map.get(k), 'go' + (highlight && (k === highlight) ? ' me' : ''))).join('')}
       </tbody></table>
       <div class="st-note">· 기준재고: 이관을 반영한 조정 수량 (다른 판매점으로 옮겨진 미조사 단말은 옮겨 간 곳에서 조사)<br>
-      · 개통완료: 기준재고에 있었는데 현재재고에 없는 단말 · 진행율 = (입력완료+개통완료) ÷ (기준재고 − 분실)<br>· 행을 누르면 하위 목록으로 이동합니다</div>`;
+      · 개통완료: 기준재고에 있었는데 현재재고에 없는 단말 · 진행율 = (입력완료+개통완료+분실) ÷ 기준재고<br>· 행을 누르면 하위 목록으로 이동합니다</div>`;
     };
     const ST = { todo: ['미완료', 0], lost: ['분실', 1], done: ['입력완료', 2], sold: ['개통완료', 3] };
     const listHtml = (sid, group) => {
