@@ -286,10 +286,10 @@
   </div>
 </main>
 
-<script src="config.js?v=20261110f"></script>
-<script src="appwrite.js?v=20261110f"></script>
-<script src="stock.js?v=20261110f"></script>
-<script src="stats.js?v=20261110f"></script>
+<script src="config.js?v=20261110g"></script>
+<script src="appwrite.js?v=20261110g"></script>
+<script src="stock.js?v=20261110g"></script>
+<script src="stats.js?v=20261110g"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script>
 const $ = id => document.getElementById(id);
@@ -697,7 +697,7 @@ function renderReport() {
   const colg = '<colgroup><col style="width:5%"><col style="width:7%"><col style="width:7.5%"><col style="width:21%"><col style="width:12%"><col style="width:12.5%"><col style="width:9.5%"><col style="width:9.5%"><col></colgroup>';
   const thead = '<thead><tr><th>순번</th><th>그룹</th><th>담당</th><th>POS닉네임</th><th>모델명</th><th>일련번호</th><th>출고가</th><th>구분</th><th>비고</th></tr></thead>';
   // POS닉네임·일련번호·비고는 칸이 모자라면 줄바꿈 (잘리지 않게)
-  const trow = (x, i) => `<tr${x.active ? '' : ' style="color:#888"'}><td>${i + 1}</td>${regCell(x.region, 12)}<td class="nw">${esc(x.group)}</td><td class="l wr" style="font-size:11px">${esc(x.nick)}</td><td class="nw" style="font-size:11px">${esc(x.model)}</td><td class="wr" style="font-size:11px">${esc(showSerialRp(x))}</td><td class="n">${fmtN(x.price)}</td><td class="nw${x.kind === '추가 확인건' ? ' red' : ''}"${x.active ? '' : ' style="color:#0a7a3a;font-weight:700"'}>${x.kind}</td><td class="l wr" style="font-size:11px">${esc(x.memo)}</td></tr>`;
+  const trow = (x, i) => `<tr${x.active ? '' : ' style="color:#888"'}><td>${i + 1}</td>${regCell(x.region, 12)}<td class="nw">${esc(x.group)}</td><td class="l wr" style="font-size:11px">${esc(x.nick)}</td><td class="nw" style="font-size:11px">${esc(x.model)}</td><td class="wr" style="font-size:11px">${esc(showSerialRp(x))}</td><td class="n">${fmtN(x.price)}</td><td class="nw${x.kind === '추가 확인건' ? ' red' : ''}" style="font-size:11px;letter-spacing:-.3px${x.active ? '' : ';color:#0a7a3a;font-weight:700'}">${x.kind}</td><td class="l wr" style="font-size:11px">${esc(x.memo)}</td></tr>`;
   const totRow = `<tr class="tot"><td colspan="6">합계 ${fmtN(LA.length)}건 (추가 확인 ${fmtN(L.filter(x => x.kind === '추가 확인건').length)} · 기존 분실 ${fmtN(L.filter(x => x.kind === '기존 분실건').length)})${nOff ? ` · 발견·개통확인 ${fmtN(nOff)}건 제외` : ''}</td><td class="n">${fmtN(sumPrice)}</td><td colspan="2"></td></tr>`;
   // 줄바꿈으로 행 높이가 달라지므로 실제 높이를 재면서 A4 한 장씩 채움
   const PAGE_H = 1110;                                   // A4 세로(폭 794px 기준) — PDF 여백 포함
@@ -834,7 +834,7 @@ $('btnRpXlsx').onclick = async () => {
       D.lost.forEach((x, i) => {
         put(r, 1, i + 1); put(r, 2, x.region, { shrink: true, font: { size: x.region.length >= 4 ? 9 : 10 } }); put(r, 3, x.group, { shrink: true });
         put(r, 4, x.nick, { h: 'left', font: { size: 9 } }); put(r, 5, x.model, { shrink: true }); put(r, 6, showSerialRp(x), { font: { size: 9 } });
-        put(r, 7, x.price, { h: 'right', fmt: '#,##0' }); put(r, 8, x.kind, x.kind === '추가 확인건' ? { font: RED } : x.active ? {} : { font: { color: { argb: 'FF0A7A3A' }, bold: true } }); put(r, 9, x.memo, { h: 'left', font: { size: 9 } });
+        put(r, 7, x.price, { h: 'right', fmt: '#,##0' }); put(r, 8, x.kind, { font: { size: 9, ...(x.kind === '추가 확인건' ? RED : x.active ? {} : { color: { argb: 'FF0A7A3A' }, bold: true }) } }); put(r, 9, x.memo, { h: 'left', font: { size: 9 } });
         // 줄바꿈된 칸에 맞춰 행 높이 (엑셀은 자동 맞춤을 안 해줌): 한글 2칸, 그 외 1칸으로 길이 계산
         const vw = t => [...String(t || '')].reduce((n, ch) => n + (/[\u3131-\uD79D]/.test(ch) ? 2 : 1), 0);
         const lines = Math.max(1, Math.ceil(vw(x.nick) / 33), Math.ceil(vw(x.memo) / 33), Math.ceil(vw(showSerialRp(x)) / 16));
