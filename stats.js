@@ -32,7 +32,7 @@
         if (seen.has(k)) { dup++; continue; }
         seen.add(k);
         out.push({ pcode: d.pcode, staff: d.pcode === '영업사원' ? d.store : '', store: d.pcode === '영업사원' ? `${d.store} (영업사원)` : d.store,
-                   model: x.m || '', serial: x.s || '', serialRaw: x.r || x.s || '', matched: !!x.k, at: d.$createdAt });
+                   model: x.m || '', serial: x.s || '', serialRaw: x.r || x.s || '', matched: !!x.k, at: d.$createdAt, docId: d.$id });
       }
     }
     return { entries: out, dup };
@@ -118,7 +118,7 @@
   .st-tbl tr.go{cursor:pointer} .st-tbl tr.go:active td,.st-tbl tr.go:hover td{background:#222733}
   .st-tbl tr.me td{background:rgba(16,185,129,.10)}
   .st-tbl tr.tot td{font-weight:800;border-top:2px solid #3a4150}
-  .st-tbl .done{color:#22c55e} .st-tbl .gone{color:#9aa3b2} .st-tbl .lost{color:#f87171} .st-tbl .todo{color:#f59e0b;font-weight:700}
+  .st-tbl .done{color:#22c55e} .st-tbl .gone{color:#60a5fa} .st-tbl .lost{color:#f87171} .st-tbl .todo{color:#f59e0b;font-weight:700}
   .st-tbl small{display:block;color:#60a5fa;font-size:11px;font-weight:400}
   .st-bar{height:5px;background:#2a2f3a;border-radius:3px;margin-top:3px;overflow:hidden}
   .st-bar i{display:block;height:100%;background:#22c55e}
@@ -132,7 +132,7 @@
   .st-flt button.on{background:#f59e0b;border-color:#f59e0b;color:#1a1200}
   .st-flt button.on.all{background:#3b82f6;border-color:#3b82f6;color:#fff}
   .st-st{display:inline-block;font-size:11px;font-weight:700;padding:2px 7px;border-radius:999px;white-space:nowrap}
-  .st-st.done{background:rgba(34,197,94,.18);color:#4ade80}.st-st.sold{background:rgba(148,163,184,.18);color:#cbd5e1}
+  .st-st.done{background:rgba(34,197,94,.18);color:#4ade80}.st-st.sold{background:rgba(59,130,246,.2);color:#60a5fa}
   .st-st.lost{background:rgba(239,68,68,.2);color:#f87171}.st-st.todo{background:rgba(245,158,11,.2);color:#fbbf24}
   .st-list tr.dim td{opacity:.75}`;
   function injectCss() { if (document.getElementById('st-css')) return; const s = document.createElement('style'); s.id = 'st-css'; s.textContent = css; document.head.appendChild(s); }
@@ -140,7 +140,7 @@
   const n = v => (v || 0).toLocaleString();
   // 삼성은 라벨처럼 7자리로 표시 (엑셀에서 빠진 앞자리 0 복원)
   const showSerial = r => /^SM-/i.test(r.model) && /^\d{1,6}$/.test(r.serial) ? r.serial.padStart(7, '0') : r.serial;
-  // 진행률 = 조사완료합계(입력완료+개통완료) ÷ (조정재고 − 분실)  → 분실은 확인된 건이라 분모에서 빼서 최대 100%
+  // 진행율 = 조사완료합계(입력완료+개통완료) ÷ (조정재고 − 분실)  → 분실은 확인된 건이라 분모에서 빼서 최대 100%
   const rate = a => { const d = (a.base || 0) - (a.lost || 0); return d > 0 ? (a.done + a.sold) / d : (a.base ? 1 : 0); };
   const pct = a => Math.round(rate(a) * 100);
 
@@ -187,18 +187,18 @@
           <div class="st-bar"><i style="width:${pct(a)}%"></i></div></td>
         <td>${n(a.base)}</td><td class="done">${n(a.done)}</td><td class="gone">${n(a.sold)}</td>${showLost ? `<td class="lost">${n(a.lost)}</td>` : ''}<td class="todo">${n(a.todo)}</td><td>${pct(a)}%</td></tr>`;
       const tot = sum(keys.map(k => map.get(k)));
-      return `<table class="st-tbl"><thead><tr><th>${label}</th><th>기준재고</th><th>입력완료</th><th>개통완료</th>${showLost ? '<th>분실</th>' : ''}<th>미완료</th><th>진행률</th></tr></thead><tbody>
+      return `<table class="st-tbl"><thead><tr><th>${label}</th><th>기준재고</th><th>입력완료</th><th>개통완료</th>${showLost ? '<th>분실</th>' : ''}<th>미완료</th><th>진행율</th></tr></thead><tbody>
         ${row('합계', tot, 'tot')}
         ${keys.map(k => row(k, map.get(k), 'go' + (highlight && (k === highlight) ? ' me' : ''))).join('')}
       </tbody></table>
       <div class="st-note">· 기준재고: 이관을 반영한 조정 수량 (다른 판매점으로 옮겨진 미조사 단말은 옮겨 간 곳에서 조사)<br>
-      · 개통완료: 기준재고에 있었는데 현재재고에 없는 단말 · 진행률 = (입력완료+개통완료) ÷ (기준재고 − 분실)<br>· 행을 누르면 하위 목록으로 이동합니다</div>`;
+      · 개통완료: 기준재고에 있었는데 현재재고에 없는 단말 · 진행율 = (입력완료+개통완료) ÷ (기준재고 − 분실)<br>· 행을 누르면 하위 목록으로 이동합니다</div>`;
     };
     const ST = { todo: ['미완료', 0], lost: ['분실', 1], done: ['입력완료', 2], sold: ['개통완료', 3] };
     const listHtml = (sid, group) => {
       const all = storeList(res, sid, group);
       const a = aggregate(res, 'store', r => storeId(r) === sid && (group == null || (r.group || '(미지정)') === group)).map.get(sid) || empty();
-      const head = `<div class="st-note" style="margin:0 0 8px">기준재고 ${n(a.base)}${(a.out || a.in) ? ` (원래 ${n(a.base0)}${a.out ? ' −' + n(a.out) : ''}${a.in ? ' +' + n(a.in) : ''})` : ''} · 입력완료 <b style="color:#22c55e">${n(a.done)}</b> · 개통완료 ${n(a.sold)}${a.lost ? ` · <span style="color:#f87171">분실 ${n(a.lost)}</span>` : ''} · <b style="color:#f59e0b">미완료 ${n(a.todo)}</b></div>`;
+      const head = `<div class="st-note" style="margin:0 0 8px">기준재고 ${n(a.base)}${(a.out || a.in) ? ` (원래 ${n(a.base0)}${a.out ? ' −' + n(a.out) : ''}${a.in ? ' +' + n(a.in) : ''})` : ''} · 입력완료 <b style="color:#22c55e">${n(a.done)}</b> · 개통완료 <b style="color:#60a5fa">${n(a.sold)}</b>${a.lost ? ` · <span style="color:#f87171">분실 ${n(a.lost)}</span>` : ''} · <b style="color:#f59e0b">미완료 ${n(a.todo)}</b></div>`;
       const flt = `<div class="st-flt"><button data-f="all" class="all${onlyTodo ? '' : ' on'}">전체 ${n(all.length)}</button><button data-f="todo" class="${onlyTodo ? 'on' : ''}">미완료만 보기 ${n(a.todo)}</button></div>`;
       const rows = onlyTodo ? all.filter(x => x.status === 'todo') : all;
       if (!rows.length) return head + flt + `<div class="st-empty">${onlyTodo ? '조사 미완료 재고가 없습니다' : '해당 재고가 없습니다'}</div>`;
