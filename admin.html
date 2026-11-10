@@ -102,7 +102,9 @@
   .rp-page .sign .k{grid-row:1/3;border-left:0;display:flex;align-items:center;justify-content:center;writing-mode:vertical-rl;font-weight:800;font-size:16px;letter-spacing:6px}
   .rp-page .sign .h{border-bottom:1px solid #000;padding:8px 0;font-weight:800;font-size:16px}
   .rp-page .sign .b{height:80px}
-  .rp-page + .rp-page{margin-top:14px}
+  .rp-page + .rp-page,#report + #reportLost{margin-top:14px}
+  .rp-page.lp table{table-layout:fixed}.rp-page.lp td{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.rp-page.lp tr.tot td{overflow:visible;font-size:11.5px}.rp-page.lp td.n{padding-right:4px;font-size:11.5px}
+  .rp-page .cont{display:flex;justify-content:space-between;font-size:12px;margin-bottom:8px}
   .rp-page td.nw{white-space:nowrap;letter-spacing:-.3px}
   .rp-page td.l{text-align:left;padding-left:5px}
   .lost-form{display:grid;grid-template-columns:2fr 1.4fr 1fr 2fr auto;gap:6px;align-items:end}
@@ -149,7 +151,7 @@
           <label>기준일<input id="rpDate"></label>
         </div>
         <div class="msg" id="rpMsg" style="margin:0 0 6px"></div>
-        <div class="rp-wrap fill" id="rpWrap"><div id="rpZoom"><div id="report" class="rp-page"></div><div id="reportLost" class="rp-page"></div></div></div>
+        <div class="rp-wrap fill" id="rpWrap"><div id="rpZoom"><div id="report" class="rp-page"></div><div id="reportLost"></div></div></div>
       </div>
       </div>
     </section>
@@ -263,10 +265,10 @@
   </div>
 </main>
 
-<script src="config.js?v=20261110b"></script>
-<script src="appwrite.js?v=20261110b"></script>
-<script src="stock.js?v=20261110b"></script>
-<script src="stats.js?v=20261110b"></script>
+<script src="config.js?v=20261110d"></script>
+<script src="appwrite.js?v=20261110d"></script>
+<script src="stock.js?v=20261110d"></script>
+<script src="stats.js?v=20261110d"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script>
 const $ = id => document.getElementById(id);
@@ -479,7 +481,7 @@ function renderSummary() {
   if (!statRes) { $('stSum').innerHTML = ''; return; }
   const t = { base0: 0, out: 0, in: 0, base: 0, done: 0, sold: 0, lost: 0, todo: 0 };
   for (const a of Stats.aggregate(statRes, 'region').map.values()) for (const k in t) t[k] += a[k];
-  const pct = t.base ? ((t.done + t.sold) / t.base * 100).toFixed(1) : '0.0';
+  const pct = (Stats.rate(t) * 100).toFixed(1);
   $('stSum').innerHTML = [
     ['기준재고', t.base0, ''], ['조정재고', t.base, (t.out || t.in) ? `이관 −${fmtN(t.out)} +${fmtN(t.in)}` : ''],
     ['입력완료', t.done, '', 'var(--ok)'], ['개통완료', t.sold, '', '#60a5fa'], ['분실', t.lost, '', t.lost ? 'var(--bad)' : ''],
@@ -529,7 +531,7 @@ $('btnDlAll2').onclick = () => downloadAll(null);
 $('btnDlStats').onclick = () => {
   if (!statRes) return alert('기준재고를 먼저 업로드하세요');
   const hd = ['기준재고', '이관출고', '이관입고', '조정재고', '입력완료', '개통완료', '조사완료합계', '분실', '미완료', '진행율'];
-  const line = a => [a.base0, a.out, a.in, a.base, a.done, a.sold, a.done + a.sold, a.lost, a.todo, a.base ? Math.round((a.done + a.sold) / a.base * 1000) / 10 + '%' : '-'];
+  const line = a => [a.base0, a.out, a.in, a.base, a.done, a.sold, a.done + a.sold, a.lost, a.todo, a.base ? Math.round(Stats.rate(a) * 1000) / 10 + '%' : '-'];
   const reg = Stats.aggregate(statRes, 'region').map;
   const grp = Stats.aggregate(statRes, 'group');
   const sto = Stats.aggregate(statRes, 'store');
@@ -557,7 +559,7 @@ const I_LOST = 7, I_TODO = 8;
 })();
 function reportData() {
   if (!statRes) return null;
-  const line = a => { const total = a.done + a.sold; return [a.base0, a.out, a.in, a.base, a.done, a.sold, total, a.lost, a.todo, a.base ? total / a.base : 0]; };
+  const line = a => { const total = a.done + a.sold; return [a.base0, a.out, a.in, a.base, a.done, a.sold, total, a.lost, a.todo, Stats.rate(a)]; };
   const reg = Stats.aggregate(statRes, 'region').map;
   const grp = Stats.aggregate(statRes, 'group').map;
   const regions = Stats.REGIONS.filter(r => reg.has(r)).map(r => [r, ...line(reg.get(r))]);
@@ -578,7 +580,7 @@ function lostReportRows() {
              serial: it ? it.b.serial : l.serial, price: it ? (it.b.price || 0) : 0, kind: l.prev === 'Y' ? '기존 분실건' : '추가 확인건',
              memo: [l.memo, auto].filter(Boolean).join(' / ') };
   });
-  rows.sort((x, y) => (Stats.REGIONS.indexOf(x.region) + 1 || 99) - (Stats.REGIONS.indexOf(y.region) + 1 || 99) || (order.get(x.group) ?? 9999) - (order.get(y.group) ?? 9999)
+  rows.sort((x, y) => (x.kind === '추가 확인건' ? 0 : 1) - (y.kind === '추가 확인건' ? 0 : 1) || (Stats.REGIONS.indexOf(x.region) + 1 || 99) - (Stats.REGIONS.indexOf(y.region) + 1 || 99) || (order.get(x.group) ?? 9999) - (order.get(y.group) ?? 9999)
     || String(x.nick).localeCompare(y.nick) || String(x.model).localeCompare(y.model));
   return rows;
 }
@@ -586,6 +588,18 @@ const fmtN = v => (v || 0).toLocaleString();
 const fmtP = v => (v * 100).toFixed(1) + '%';
 const showSerialRp = r => /^SM-/i.test(r.model) && /^\d{1,6}$/.test(r.serial) ? r.serial.padStart(7, '0') : r.serial;
 const SIGN_HTML = `<div class="sign"><div class="k">결재</div>${['담당', '대표', '점검', '확인', '확정'].map(h => `<div class="h">${h}</div>`).join('')}${'<div class="b"></div>'.repeat(5)}</div>`;
+// 분실리스트 장 나누기: 1장 최대 LP_FIRST행, 이후 LP_NEXT행, 마지막 장은 결재란 자리(LP_SIGN행) 비움
+const LP_FIRST = 38, LP_NEXT = 44, LP_SIGN = 7;
+function lostPages(total) {
+  const out = []; let i = 0, first = true;
+  if (!total) return [[0, 0]];
+  while (true) {
+    const cap = first ? LP_FIRST : LP_NEXT, left = total - i;
+    if (left <= cap - LP_SIGN) { out.push([i, total]); break; }
+    const take = Math.min(cap, left - 1); out.push([i, i + take]); i += take; first = false;
+  }
+  return out;
+}
 function renderReport() {
   const D = reportData();
   if (!D) { $('report').innerHTML = '<div style="padding:40px;text-align:center;color:#666">기준재고를 업로드하면 보고서가 만들어집니다</div>'; $('reportLost').innerHTML = ''; return; }
@@ -604,15 +618,21 @@ function renderReport() {
       ${D.groups.map(g => { const sep = prev !== null && prev !== g[0]; prev = g[0];
         return `<tr class="${sep ? 'sep' : ''}">${regCell(g[0], 12)}<td class="nw" style="font-size:${g[1].length > 6 ? 10 : 12}px">${esc(g[1])}</td>${cells(g.slice(2), false, true)}</tr>`; }).join('')}
       </tbody></table>${SIGN_HTML}`;
-  // 2페이지: 분실리스트
-  const L = D.lost, sumPrice = L.reduce((s, x) => s + x.price, 0);
-  $('reportLost').innerHTML = `<h1>■□ ${esc($('rpLostTitle').value)} □■</h1><div class="rule"></div>${meta}
-    <table><colgroup><col style="width:6%"><col style="width:8%"><col style="width:9%"><col style="width:22%"><col style="width:13%"><col style="width:11%"><col style="width:9%"><col style="width:10%"><col></colgroup>
-      <thead><tr><th>순번</th><th>그룹</th><th>담당</th><th>POS닉네임</th><th>모델명</th><th>일련번호</th><th>출고가</th><th>구분</th><th>비고</th></tr></thead><tbody>
-      ${L.length ? L.map((x, i) => `<tr><td>${i + 1}</td>${regCell(x.region, 12)}<td class="nw">${esc(x.group)}</td><td class="l" style="font-size:11px">${esc(x.nick)}</td><td class="nw" style="font-size:11.5px">${esc(x.model)}</td><td>${esc(showSerialRp(x))}</td><td class="n">${fmtN(x.price)}</td><td class="nw${x.kind === '추가 확인건' ? ' red' : ''}">${x.kind}</td><td class="l" style="font-size:11px">${esc(x.memo)}</td></tr>`).join('')
-        : '<tr><td colspan="9" style="padding:18px;color:#666">등록된 분실 건이 없습니다</td></tr>'}
-      <tr class="tot"><td colspan="6">합계 ${fmtN(L.length)}건 (기존 분실 ${fmtN(L.filter(x => x.kind === '기존 분실건').length)} · 추가 확인 ${fmtN(L.filter(x => x.kind === '추가 확인건').length)})</td><td class="n">${fmtN(sumPrice)}</td><td colspan="2"></td></tr>
-      </tbody></table>${SIGN_HTML}`;
+  // 2페이지~: 분실리스트 (길면 여러 장, 제목열은 매 장 반복, 결재란은 마지막 장에만)
+  const L = D.lost, sumPrice = L.reduce((t, x) => t + x.price, 0);
+  const colg = '<colgroup><col style="width:5%"><col style="width:8%"><col style="width:8%"><col style="width:22%"><col style="width:13%"><col style="width:11%"><col style="width:10.5%"><col style="width:10%"><col></colgroup>';
+  const thead = '<thead><tr><th>순번</th><th>그룹</th><th>담당</th><th>POS닉네임</th><th>모델명</th><th>일련번호</th><th>출고가</th><th>구분</th><th>비고</th></tr></thead>';
+  const trow = (x, i) => `<tr><td>${i + 1}</td>${regCell(x.region, 12)}<td class="nw">${esc(x.group)}</td><td class="l" style="font-size:11px" title="${esc(x.nick)}">${esc(x.nick)}</td><td class="nw" style="font-size:11.5px">${esc(x.model)}</td><td>${esc(showSerialRp(x))}</td><td class="n">${fmtN(x.price)}</td><td class="nw${x.kind === '추가 확인건' ? ' red' : ''}">${x.kind}</td><td class="l" style="font-size:11px" title="${esc(x.memo)}">${esc(x.memo)}</td></tr>`;
+  const totRow = `<tr class="tot"><td colspan="6">합계 ${fmtN(L.length)}건 (추가 확인 ${fmtN(L.filter(x => x.kind === '추가 확인건').length)} · 기존 분실 ${fmtN(L.filter(x => x.kind === '기존 분실건').length)})</td><td class="n">${fmtN(sumPrice)}</td><td colspan="2"></td></tr>`;
+  const chunks = lostPages(L.length);
+  const NP = chunks.length;
+  $('reportLost').innerHTML = chunks.map(([from, to], pi) => {
+    const last = pi === NP - 1;
+    const body = L.length ? L.slice(from, to).map((x, k) => trow(x, from + k)).join('') : '<tr><td colspan="9" style="padding:18px;color:#666">등록된 분실 건이 없습니다</td></tr>';
+    const headTxt = pi === 0 ? `<h1>■□ ${esc($('rpLostTitle').value)} □■</h1><div class="rule"></div>${meta}`
+      : `<div class="cont"><span>${esc($('rpLostTitle').value)} (계속)</span><span>${pi + 1} / ${NP}</span></div>`;
+    return `<div class="rp-page lp">${headTxt}<table>${colg}${thead}<tbody>${body}${last ? totRow : ''}</tbody></table>${last ? SIGN_HTML : `<div style="text-align:right;font-size:12px">${pi + 1} / ${NP}</div>`}</div>`;
+  }).join('');
   fitReport();
 }
 const loadScript = src => new Promise((ok, no) => { if (document.querySelector(`script[src="${src}"]`)) return ok(); const t = document.createElement('script'); t.src = src; t.onload = ok; t.onerror = () => no(new Error('라이브러리 로딩 실패: ' + src)); document.head.appendChild(t); });
@@ -621,16 +641,16 @@ function saveBlob(blob, name) { const a = document.createElement('a'); a.href = 
 async function reportCanvases() {
   await loadScript('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js');
   const z = $('rpZoom'), keep = z.style.zoom; z.style.zoom = '1';      // 축소 미리보기는 원래 크기로 캡처
-  try { return [await html2canvas($('report'), { scale: 2, backgroundColor: '#ffffff' }), await html2canvas($('reportLost'), { scale: 2, backgroundColor: '#ffffff' })]; }
+  try { const out = []; for (const pg of [$('report'), ...$('reportLost').querySelectorAll('.rp-page')]) out.push(await html2canvas(pg, { scale: 2, backgroundColor: '#ffffff' })); return out; }
   finally { z.style.zoom = keep; }
 }
 $('btnRpPng').onclick = async () => {
   if (!statRes) return alert('기준재고를 먼저 업로드하세요');
   $('rpMsg').textContent = '이미지 만드는 중...';
   try {
-    const [c1, c2] = await reportCanvases(), gap = 60;     // 1·2페이지를 세로로 이어 붙인 이미지 1장
-    const c = document.createElement('canvas'); c.width = Math.max(c1.width, c2.width); c.height = c1.height + gap + c2.height;
-    const g = c.getContext('2d'); g.fillStyle = '#ddd'; g.fillRect(0, 0, c.width, c.height); g.drawImage(c1, 0, 0); g.drawImage(c2, 0, c1.height + gap);
+    const cs = await reportCanvases(), gap = 60;     // 모든 페이지를 세로로 이어 붙인 이미지 1장
+    const c = document.createElement('canvas'); c.width = Math.max(...cs.map(x => x.width)); c.height = cs.reduce((t, x) => t + x.height, 0) + gap * (cs.length - 1);
+    const g = c.getContext('2d'); g.fillStyle = '#ddd'; g.fillRect(0, 0, c.width, c.height); let y = 0; for (const x of cs) { g.drawImage(x, 0, y); y += x.height + gap; }
     c.toBlob(b => { saveBlob(b, rpName('png')); $('rpMsg').textContent = ''; }, 'image/png');
   } catch (e) { $('rpMsg').innerHTML = `<span class="bad">${esc(e.message)}</span>`; }
 };
@@ -718,7 +738,9 @@ $('btnRpXlsx').onclick = async () => {
     {
       const LC = 9, { ws, put, outline, top, sign } = sheet('2.분실리스트', LC, [6, 9, 9, 30, 15, 12, 11, 12, 26]);
       let r = top($('rpLostTitle').value);
-      const s = r; ['순번', '그룹', '담당', 'POS닉네임', '모델명', '일련번호', '출고가', '구분', '비고'].forEach((h, i) => put(r, 1 + i, h, { fill: 'FFF2F2F2', font: { bold: true } })); ws.getRow(r).height = 24; r++;
+      ws.pageSetup.fitToHeight = 0;                       // 길면 여러 장 (가로는 1장 폭)
+      const s = r; ws.pageSetup.printTitlesRow = `${s}:${s}`;  // 제목열을 매 장 반복
+      ['순번', '그룹', '담당', 'POS닉네임', '모델명', '일련번호', '출고가', '구분', '비고'].forEach((h, i) => put(r, 1 + i, h, { fill: 'FFF2F2F2', font: { bold: true } })); ws.getRow(r).height = 24; r++;
       if (!D.lost.length) { ws.mergeCells(r, 1, r, LC); put(r, 1, '등록된 분실 건이 없습니다', { font: { color: { argb: 'FF666666' } } }); r++; }
       D.lost.forEach((x, i) => {
         put(r, 1, i + 1); put(r, 2, x.region, { shrink: true, font: { size: x.region.length >= 4 ? 9 : 10 } }); put(r, 3, x.group, { shrink: true });
@@ -726,7 +748,7 @@ $('btnRpXlsx').onclick = async () => {
         put(r, 7, x.price, { h: 'right', fmt: '#,##0' }); put(r, 8, x.kind, x.kind === '추가 확인건' ? { font: RED } : {}); put(r, 9, x.memo, { h: 'left', font: { size: 9 } }); r++;
       });
       const yl = { fill: 'FFFFF2CC', font: { bold: true } };
-      ws.mergeCells(r, 1, r, 6); put(r, 1, `합계 ${D.lost.length}건 (기존 분실 ${D.lost.filter(x => x.kind === '기존 분실건').length} · 추가 확인 ${D.lost.filter(x => x.kind === '추가 확인건').length})`, yl);
+      ws.mergeCells(r, 1, r, 6); put(r, 1, `합계 ${D.lost.length}건 (추가 확인 ${D.lost.filter(x => x.kind === '추가 확인건').length} · 기존 분실 ${D.lost.filter(x => x.kind === '기존 분실건').length})`, yl);
       put(r, 7, D.lost.reduce((t, x) => t + x.price, 0), { ...yl, h: 'right', fmt: '#,##0' }); ws.mergeCells(r, 8, r, 9); put(r, 8, '', yl);
       outline(s, r); sign(r + 2);
     }
