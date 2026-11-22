@@ -1,6 +1,6 @@
 // ===== Appwrite 설정 (Appwrite 콘솔에서 만든 ID와 똑같이 맞춰주세요) =====
 window.APP_CONFIG = {
-  endpoint:     'https://appwrite.kim-gwajang.com/v1',
+  endpoint:     'https://api.kim-gwajang.com/v1',
   projectId:    'stockscan',      // Appwrite 프로젝트 ID
 
   // 비공개 버킷: 출고가 포함 기준재고 원본 (관리자만)
