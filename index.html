@@ -22,7 +22,7 @@
   #installBar button{width:100%;background:#fff;color:#047857;border:0;font-size:16px;font-weight:800;padding:12px;border-radius:10px;font-family:inherit}
   label.fl{display:block;font-size:13px;color:var(--sub);margin:0 0 6px;font-weight:600}
   input[type=password]{width:100%;background:#0f1115;color:var(--txt);border:1px solid var(--line);border-radius:10px;padding:13px;font-size:17px;font-family:inherit;margin-top:10px;letter-spacing:4px}
-  input[type=search]{width:100%;background:#0f1115;color:var(--txt);border:1px solid var(--line);border-radius:10px;padding:13px;font-size:17px;font-family:inherit}
+  input[type=search],#staffName,#staffPw{width:100%;background:#0f1115;color:var(--txt);border:1px solid var(--line);border-radius:10px;padding:13px;font-size:17px;font-family:inherit}
   .ac{position:relative}
   #sugg{position:absolute;left:0;right:0;top:100%;margin-top:4px;background:#111827;border:1px solid var(--line);border-radius:10px;max-height:300px;overflow:auto;z-index:20;box-shadow:0 10px 30px rgba(0,0,0,.5)}
   #sugg div{padding:11px 12px;border-bottom:1px solid var(--line);cursor:pointer;display:flex;gap:10px}
@@ -114,7 +114,10 @@
   #closedView h1{font-size:22px;margin:14px 0 18px}
   .closedBox{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:22px 16px;display:grid;gap:10px;font-size:14px;color:var(--sub);line-height:1.6}
   .closedBox b{font-size:17px;color:var(--warn)}
-  #staffPw{-webkit-text-security:disc;text-security:disc}
+  #staffPw{-webkit-text-security:disc;text-security:disc;margin-top:10px}
+  #staffPw:placeholder-shown{letter-spacing:0}
+  #staffPw:not(:placeholder-shown){letter-spacing:4px}
+  #staffName:focus,#staffPw:focus,input[type=search]:focus{outline:none;border-color:var(--acc)}
 </style>
 </head>
 <body>
@@ -151,7 +154,7 @@
   </div>
   <div id="recentPick" class="hidden"></div>
   <div class="info" style="justify-content:center"><span id="dataInfo">판매점·재고 목록 불러오는 중...</span><a id="btnReload">새로고침</a></div>
-  <div class="ver">버전 20261124b</div>
+  <div class="ver">버전 20261124c</div>
 </div>
 
 <!-- 조사 화면 -->
@@ -203,10 +206,10 @@
 </div></div>
 <div class="toast" id="toast"></div>
 
-<script src="config.js?v=20261124b"></script>
-<script src="appwrite.js?v=20261124b"></script>
-<script src="stock.js?v=20261124b"></script>
-<script src="stats.js?v=20261124b"></script>
+<script src="config.js?v=20261124c"></script>
+<script src="appwrite.js?v=20261124c"></script>
+<script src="stock.js?v=20261124c"></script>
+<script src="stats.js?v=20261124c"></script>
 <script type="module">
 const $ = id => document.getElementById(id);
 const C = window.APP_CONFIG;
