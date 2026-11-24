@@ -40,6 +40,13 @@
   .box{position:absolute;left:5%;right:5%;top:25%;height:50%;border:2px solid rgba(255,255,255,.85);border-radius:8px;box-shadow:0 0 0 9999px rgba(0,0,0,.35);pointer-events:none;transition:border-color .15s}
   .box.hit{border-color:var(--ok)}
   .cam .camMsg{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;padding:20px;color:#ccc;font-size:14px;white-space:pre-line}
+  .camCtl{position:absolute;left:0;right:0;bottom:8px;display:flex;justify-content:space-between;align-items:center;padding:0 8px;pointer-events:none}
+  .camCtl button{pointer-events:auto;background:rgba(0,0,0,.55);border:1px solid rgba(255,255,255,.35);color:#fff;border-radius:999px;padding:6px 11px;font-size:13px;font-weight:700;min-width:44px}
+  .camCtl button.on{background:#fff;color:#000}
+  .zooms,.camCtl .rb{display:flex;gap:6px}
+  .focusRing{position:absolute;width:64px;height:64px;margin:-32px 0 0 -32px;border:2px solid #fde047;border-radius:50%;pointer-events:none;animation:fr .7s ease-out forwards}
+  @keyframes fr{0%{transform:scale(1.4);opacity:1}100%{transform:scale(1);opacity:0}}
+  .camTip{font-size:12px;color:var(--sub);text-align:center;margin-top:5px;min-height:1em}
   .btns{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:10px}
   button,.filebtn{background:var(--card);color:var(--txt);border:1px solid var(--line);border-radius:10px;padding:13px 4px;font-size:15px;font-weight:700;text-align:center;cursor:pointer;font-family:inherit}
   .filebtn input{display:none}
@@ -142,7 +149,7 @@
   </div>
   <div id="recentPick" class="hidden"></div>
   <div class="info" style="justify-content:center"><span id="dataInfo">판매점·재고 목록 불러오는 중...</span><a id="btnReload">새로고침</a></div>
-  <div class="ver">버전 20261110g</div>
+  <div class="ver">버전 20261124a</div>
 </div>
 
 <!-- 조사 화면 -->
@@ -156,7 +163,13 @@
     <video id="video" playsinline muted autoplay></video>
     <div class="box" id="box"></div>
     <div class="camMsg" id="camMsg">[카메라]를 누르면 스캔을 시작합니다</div>
+    <div class="camCtl hidden" id="camCtl">
+      <div class="zooms" id="zooms"></div>
+      <div class="rb"><button id="btnTorch" class="hidden" title="플래시">💡</button><button id="btnLens" class="hidden" title="렌즈 전환">렌즈</button></div>
+    </div>
+    <div class="focusRing hidden" id="focusRing"></div>
   </div>
+  <div class="camTip" id="camTip"></div>
   <div class="btns">
     <button id="btnCam">카메라</button>
     <label class="filebtn">사진파일<input type="file" id="file" accept="image/*"></label>
@@ -188,10 +201,10 @@
 </div></div>
 <div class="toast" id="toast"></div>
 
-<script src="config.js?v=20261110g"></script>
-<script src="appwrite.js?v=20261110g"></script>
-<script src="stock.js?v=20261110g"></script>
-<script src="stats.js?v=20261110g"></script>
+<script src="config.js?v=20261124a"></script>
+<script src="appwrite.js?v=20261124a"></script>
+<script src="stock.js?v=20261124a"></script>
+<script src="stats.js?v=20261124a"></script>
 <script type="module">
 const $ = id => document.getElementById(id);
 const C = window.APP_CONFIG;
@@ -226,13 +239,13 @@ let baseRows = null, curRows = null;   // 기준재고 / 현재재고 (조사현
 let picked = null;         // {code, name}
 
 function parseTable(text) { return Stock.parseCSV(String(text).replace(/^﻿/, '')); }
-// 
+// ---- 재고조사 ON/OFF (관리자 화면에서 설정, 공개 버킷 settings 파일) ----
 async function surveyOpen() {
   try {
     const t = parseTable(await AW.fileText(C.publicBucketId, C.settingsFileId));
     const m = new Map(t.map(r => [String(r[0]).trim(), String(r[1] ?? '').trim()]));
     return { open: m.get('survey') !== 'off', msg: m.get('message') || '' };
-  } catch (e) { return { open: true, msg: '' }; }      // 
+  } catch (e) { return { open: true, msg: '' }; }      // 설정 파일이 없으면 열림
 }
 async function checkOpen() {
   const st = await surveyOpen();
@@ -254,13 +267,13 @@ async function loadData() {
     stores = t.slice(1).map(r => ({ code: String(r[0] || '').trim(), name: String(r[1] || '').trim() })).filter(s => s.code || s.name);
     msgs.push(`판매점 ${stores.length.toLocaleString()}곳`);
   } catch (e) { msgs.push('판매점 목록 없음'); }
-  // 
+  // 기준재고 + 현재재고 (현재재고는 판매/이관 비교용으로만 사용)
   const [b, c] = await Promise.all([
     AW.fileText(C.publicBucketId, C.basePubFileId).then(t => Stock.toStockRows(parseTable(t))).catch(() => null),
     AW.fileText(C.publicBucketId, C.curPubFileId).then(t => Stock.toStockRows(parseTable(t))).catch(() => null)
   ]);
   baseRows = b; curRows = c;
-  // 
+  // 모델명 찾기는 기준재고+현재재고 합쳐서 (입력·저장은 됨). 통계는 기준재고에 있는 단말만 집계
   const union = [...new Map([...(b || []), ...(c || [])].map(r => [Stats.key(r.model, r.serial), r])).values()];
   stockIdx = union.length ? Stock.buildIndex(union) : null;
   msgs.push(b ? `기준재고 ${b.length.toLocaleString()}건` : '기준재고 없음');
@@ -313,7 +326,7 @@ function setChip(kind) {
 $('chipStore').onclick = () => setChip('store');
 $('chipStaff').onclick = () => setChip('staff');
 
-const STAFF_PW = '7777';   // 
+const STAFF_PW = '7777';   // 영업사원 공통 비밀번호
 function enter(p) {   // p = {kind:'store'|'staff', code, name}
   picked = p;
   $('btnStat').classList.toggle('hidden', p.kind !== 'staff');   // 조사현황은 영업사원만
@@ -573,20 +586,36 @@ const ctx = canvas.getContext('2d', { willReadFrequently: true });
 let stream = null, track = null, scanning = false, camToken = 0, camWanted = false;
 const camMsg = t => { $('camMsg').textContent = t || ''; $('camMsg').classList.toggle('hidden', !t); };
 
+// ---- 카메라: 초점 문제 대응 ----
+// · 줌(1.5배~2배): 폰을 10~20cm 떨어뜨려 찍게 해서 최소 초점거리 안쪽(가까이 대면 흐려짐) 문제를 피함
+// · 렌즈 전환: 일부 폰은 기본으로 초광각/망원 렌즈가 잡혀 초점이 안 맞음 → 후면 렌즈를 돌아가며 선택, 기기에 기억
+// · 화면 터치: 그 지점으로 초점 다시 잡기 (지원 폰만) · 플래시: 어두운 창고용
+const camPref = (() => { try { return JSON.parse(localStorage.getItem('survey_cam') || '{}'); } catch (e) { return {}; } })();
+const saveCamPref = () => { try { localStorage.setItem('survey_cam', JSON.stringify(camPref)); } catch (e) {} };
+let backCams = [], torchOn = false;
+async function listBackCams() {
+  try {
+    const ds = (await navigator.mediaDevices.enumerateDevices()).filter(d => d.kind === 'videoinput');
+    const back = ds.filter(d => !/front|user|전면|facetime/i.test(d.label));
+    return (back.length ? back : ds);
+  } catch (e) { return []; }
+}
 async function startCam() {
   stopCam(false);
   const my = ++camToken;
   if (!navigator.mediaDevices?.getUserMedia) { camMsg('이 브라우저는 카메라를 지원하지 않습니다.\n(카카오톡 내장 브라우저라면 크롬/삼성인터넷으로 여세요)'); return; }
   camMsg('카메라 켜는 중...');
+  const hd = { width: { ideal: 1920 }, height: { ideal: 1080 } };
   const tries = [
-    { audio: false, video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } } },
+    ...(camPref.deviceId ? [{ audio: false, video: { deviceId: { exact: camPref.deviceId }, ...hd } }] : []),
+    { audio: false, video: { facingMode: { ideal: 'environment' }, ...hd } },
     { audio: false, video: { facingMode: 'environment' } },
     { audio: false, video: true }
   ];
   let s = null, lastErr = null;
   for (const c of tries) {
     try { s = await navigator.mediaDevices.getUserMedia(c); break; }
-    catch (e) { lastErr = e; if (e.name === 'NotAllowedError' || e.name === 'SecurityError') break; await sleep(400); }
+    catch (e) { lastErr = e; if (e.name === 'NotAllowedError' || e.name === 'SecurityError') break; if (c.video.deviceId) { delete camPref.deviceId; saveCamPref(); } await sleep(300); }
   }
   if (my !== camToken) { s?.getTracks().forEach(t => t.stop()); return; }
   if (!s) {
@@ -603,12 +632,73 @@ async function startCam() {
   try { await video.play(); } catch (e) {}
   camMsg('');
   try { await track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] }); } catch (e) {}
+  await setupCamCtl(my);
   scanning = true; loop(my);
 }
+async function setupCamCtl(my) {
+  const cap = track.getCapabilities ? track.getCapabilities() : {};
+  // 줌 버튼
+  const zs = [];
+  if (cap.zoom && cap.zoom.max > 1) {
+    for (const z of [1, 1.5, 2, 3]) if (z >= (cap.zoom.min || 1) && z <= cap.zoom.max) zs.push(z);
+    const want = camPref.zoom ?? (cap.zoom.max >= 1.5 ? 1.5 : 1);        // 처음엔 1.5배로 시작 (가까이 대서 흐려지는 문제 예방)
+    await setZoom(zs.includes(want) ? want : zs[0]);
+  }
+  $('zooms').innerHTML = zs.map(z => `<button data-z="${z}">${z}x</button>`).join('');
+  $('zooms').querySelectorAll('button').forEach(b => b.onclick = e => { e.stopPropagation(); setZoom(+b.dataset.z, true); });
+  markZoom();
+  // 플래시
+  torchOn = false; $('btnTorch').classList.toggle('hidden', !cap.torch); $('btnTorch').classList.remove('on');
+  // 렌즈 (후면 카메라가 2개 이상일 때만)
+  backCams = await listBackCams();
+  if (my !== camToken) return;
+  $('btnLens').classList.toggle('hidden', backCams.length < 2);
+  const cur = track.getSettings ? track.getSettings().deviceId : '';
+  const i = backCams.findIndex(d => d.deviceId === cur);
+  $('btnLens').textContent = backCams.length > 1 ? `렌즈 ${i + 1}/${backCams.length}` : '렌즈';
+  $('camCtl').classList.toggle('hidden', !zs.length && !cap.torch && backCams.length < 2);
+  $('camTip').textContent = zs.length ? '초점이 흐리면: 폰을 조금 떨어뜨리기 · 2x · 화면 터치' + (backCams.length > 1 ? ' · [렌즈] 바꾸기' : '')
+    : '초점이 흐리면: 폰을 10~20cm 떨어뜨리고 화면을 터치' + (backCams.length > 1 ? ' · [렌즈] 바꾸기' : '') + ' · 안 되면 [사진파일]';
+}
+async function setZoom(z, save) {
+  try { await track.applyConstraints({ advanced: [{ zoom: z }] }); } catch (e) {}
+  if (save) { camPref.zoom = z; saveCamPref(); }
+  markZoom();
+}
+function markZoom() {
+  const z = track && track.getSettings ? track.getSettings().zoom : null;
+  $('zooms').querySelectorAll('button').forEach(b => b.classList.toggle('on', z != null && Math.abs(+b.dataset.z - z) < 0.05));
+}
+$('btnTorch').onclick = async e => {
+  e.stopPropagation(); torchOn = !torchOn;
+  try { await track.applyConstraints({ advanced: [{ torch: torchOn }] }); } catch (err) { torchOn = false; }
+  $('btnTorch').classList.toggle('on', torchOn);
+};
+$('btnLens').onclick = e => {
+  e.stopPropagation(); if (backCams.length < 2) return;
+  const cur = track && track.getSettings ? track.getSettings().deviceId : '';
+  const i = backCams.findIndex(d => d.deviceId === cur);
+  camPref.deviceId = backCams[(i + 1) % backCams.length].deviceId; delete camPref.zoom; saveCamPref();
+  toast(`렌즈 ${((i + 1) % backCams.length) + 1}번으로 바꿉니다 · 초점이 잘 맞는 렌즈를 고르면 다음에도 그대로 씁니다`, 2500);
+  startCam();
+};
+// 화면 터치 → 초점 다시 잡기 (지원 폰: 터치 지점, 그 외: 연속 초점을 껐다 켜서 재조정)
+$('video').closest('.cam').addEventListener('click', async e => {
+  if (!track || e.target.closest('button')) return;
+  const r = e.currentTarget.getBoundingClientRect(), x = (e.clientX - r.left) / r.width, y = (e.clientY - r.top) / r.height;
+  const fr = $('focusRing'); fr.style.left = (x * 100) + '%'; fr.style.top = (y * 100) + '%'; fr.classList.remove('hidden'); fr.style.animation = 'none'; void fr.offsetWidth; fr.style.animation = '';
+  const cap = track.getCapabilities ? track.getCapabilities() : {};
+  try {
+    if (cap.pointsOfInterest !== undefined || 'pointsOfInterest' in (track.getSettings() || {})) await track.applyConstraints({ advanced: [{ pointsOfInterest: [{ x, y }] }] });
+    const modes = cap.focusMode || [];
+    if (modes.includes('single-shot')) { await track.applyConstraints({ advanced: [{ focusMode: 'single-shot' }] }); await sleep(900); }
+    if (modes.includes('continuous')) await track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] });
+  } catch (err) {}
+});
 function stopCam(userAction = true) {
   camToken++; scanning = false;
   if (stream) stream.getTracks().forEach(t => t.stop());
-  stream = null; track = null;
+  stream = null; track = null; $('camCtl') && $('camCtl').classList.add('hidden'); $('camTip') && ($('camTip').textContent = '');
   try { video.pause(); } catch (e) {}
   video.srcObject = null;
   if (userAction) { camMsg('[카메라]를 누르면 스캔을 시작합니다'); setStatus(''); }
