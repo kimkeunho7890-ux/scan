@@ -114,6 +114,7 @@
   #closedView h1{font-size:22px;margin:14px 0 18px}
   .closedBox{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:22px 16px;display:grid;gap:10px;font-size:14px;color:var(--sub);line-height:1.6}
   .closedBox b{font-size:17px;color:var(--warn)}
+  #staffPw{-webkit-text-security:disc;text-security:disc}
 </style>
 </head>
 <body>
@@ -143,13 +144,14 @@
   </div>
   <div class="entryBox hidden" id="boxStaff">
     <label class="fl" for="staffName">영업사원 이름</label>
-    <input type="search" id="staffName" placeholder="이름 입력" autocomplete="off">
-    <input type="password" id="staffPw" placeholder="비밀번호" inputmode="numeric" autocomplete="off" maxlength="12">
+    <input type="text" id="staffName" name="sv_staff_nm" placeholder="이름 입력" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" data-form-type="other">
+    <!-- 비밀번호 칸을 type=password로 두면 브라우저 '비밀번호 저장/자동완성'이 이름 칸을 아이디로 인식해 저장된 이름을 채워 넣음 → 일반 칸 + 글자 가림으로 처리 -->
+    <input type="text" id="staffPw" name="sv_staff_cd" placeholder="비밀번호" inputmode="numeric" pattern="[0-9]*" autocomplete="off" maxlength="12" data-lpignore="true" data-form-type="other">
     <button class="go" id="btnStaffGo">시작</button>
   </div>
   <div id="recentPick" class="hidden"></div>
   <div class="info" style="justify-content:center"><span id="dataInfo">판매점·재고 목록 불러오는 중...</span><a id="btnReload">새로고침</a></div>
-  <div class="ver">버전 20261124a</div>
+  <div class="ver">버전 20261124b</div>
 </div>
 
 <!-- 조사 화면 -->
@@ -201,10 +203,10 @@
 </div></div>
 <div class="toast" id="toast"></div>
 
-<script src="config.js?v=20261124a"></script>
-<script src="appwrite.js?v=20261124a"></script>
-<script src="stock.js?v=20261124a"></script>
-<script src="stats.js?v=20261124a"></script>
+<script src="config.js?v=20261124b"></script>
+<script src="appwrite.js?v=20261124b"></script>
+<script src="stock.js?v=20261124b"></script>
+<script src="stats.js?v=20261124b"></script>
 <script type="module">
 const $ = id => document.getElementById(id);
 const C = window.APP_CONFIG;
